@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AtendimentoStatus {
+  AGUARDANDO
+  EM_ATENDIMENTO
+  FINALIZADO
+  CANCELADO
+}
+
+enum Remetente {
+  CLIENTE
+  ATENDENTE
+  SISTEMA
+}
+
+enum TipoMensagem {
+  TEXTO
+  IMAGEM
+  AUDIO
+  VIDEO
+  DOCUMENTO
+  LOCALIZACAO
+  CONTATO
+}
+
+model Atendimento {
+  id                    String    @id @default(cuid())
+  numeroCliente         String    @unique
+  nomeCliente           String?
+  status                AtendimentoStatus @default(AGUARDANDO)
+  dataInicio            DateTime  @default(now())
+  dataFim               DateTime?
+  ultimaMensagem        DateTime  @default(now())
+  atendenteId           String?
+  prioridade            Int       @default(1)
+  tags                  String?   // JSON array de tags
+  observacoes           String?
+  canal                 String    @default("whatsapp")
+  
+  // Relacionamentos
+  mensagens             Mensagem[]
+  opcoesAtendimento     OpcaoAtendimento[]
+  
+  @@map("atendimentos")
+}
+
+model Mensagem {
+  id              String      @id @default(cuid())
+  atendimentoId   String
+  conteudo        String      @db.Text
+  tipo            TipoMensagem @default(TEXTO)
+  remetente       Remetente
+  timestamp       DateTime    @default(now())
+  lida            Boolean     @default(false)
+  midiaUrl        String?     // URL do arquivo de mídia
+  midiaTipo       String?     // Tipo MIME do arquivo
+  midiaNome       String?     // Nome original do arquivo
+  midiaTamanho    Int?        // Tamanho em bytes
+  
+  // Relacionamentos
+  atendimento     Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+  
+  @@map("mensagens")
+}
+
+model OpcaoAtendimento {
+  id              String    @id @default(cuid())
+  atendimentoId   String
+  numero          Int       // Número da opção (1, 2, 3...)
+  texto           String    @db.Text
+  acao            String?   // Ação a ser executada
+  ativo           Boolean   @default(true)
+  
+  // Relacionamentos
+  atendimento     Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+  
+  @@map("opcoes_atendimento")
+}
+
+model ConfiguracaoAtendimento {
+  id                    String    @id @default(cuid())
+  nome                  String    @unique
+  mensagemBoasVindas    String    @db.Text
+  mensagemMenu          String    @db.Text
+  mensagemDespedida     String    @db.Text
+  tempoResposta         Int       @default(300) // segundos
+  maxTentativas         Int       @default(3)
+  ativo                 Boolean   @default(true)
+  dataCriacao           DateTime  @default(now())
+  dataAtualizacao       DateTime  @updatedAt
+  
+  @@map("configuracoes_atendimento")
+}
