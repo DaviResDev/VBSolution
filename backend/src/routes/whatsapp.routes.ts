@@ -17,14 +17,20 @@ export function createWhatsAppRoutes(whatsappController: WhatsAppController) {
   // Encerrar sessão WhatsApp
   router.post('/stop-session', (req, res) => whatsappController.stopSession(req, res));
 
+  // Listar todas as sessões
+  router.get('/sessions', (req, res) => whatsappController.getSessions(req, res));
+
+  // Remover sessão
+  router.delete('/sessions/:sessionName', (req, res) => whatsappController.deleteSession(req, res));
+
   // Enviar mensagem de texto
   router.post('/send-text', (req, res) => whatsappController.sendText(req, res));
 
   // Enviar arquivo
   router.post('/send-file', (req, res) => whatsappController.sendFile(req, res));
 
-  // Enviar áudio
-  router.post('/send-audio', (req, res) => whatsappController.sendAudio(req, res));
+  // Buscar mensagens de uma sessão
+  router.get('/messages', (req, res) => whatsappController.getMessages(req, res));
 
   return router;
 }

@@ -4,7 +4,18 @@ import { z } from 'zod';
 import logger from '../logger';
 
 const startSessionSchema = z.object({
-  sessionName: z.string().optional()
+  sessionName: z.string().optional().default('default')
+});
+
+const sendMessageSchema = z.object({
+  to: z.string().min(1, 'Número de destino é obrigatório'),
+  text: z.string().min(1, 'Texto da mensagem é obrigatório')
+});
+
+const sendFileSchema = z.object({
+  to: z.string().min(1, 'Número de destino é obrigatório'),
+  filePath: z.string().min(1, 'Caminho do arquivo é obrigatório'),
+  caption: z.string().optional()
 });
 
 export class WhatsAppController {
@@ -14,12 +25,23 @@ export class WhatsAppController {
     try {
       const { sessionName } = startSessionSchema.parse(req.body);
       
-      const result = await this.whatsappService.startSession();
+      const result = await this.whatsappService.startSession(sessionName);
       
-      res.json({
-        success: true,
-        data: result
-      });
+      if (result.success) {
+        res.json({
+          success: true,
+          data: {
+            sessionId: result.sessionId,
+            qrCode: result.qrCode,
+            message: result.qrCode ? 'QR Code gerado. Escaneie com seu WhatsApp.' : 'Sessão iniciada com sucesso.'
+          }
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error || 'Erro ao iniciar sessão'
+        });
+      }
     } catch (error) {
       logger.error('Erro ao iniciar sessão WhatsApp:', error);
       res.status(500).json({
@@ -31,7 +53,8 @@ export class WhatsAppController {
 
   async getStatus(req: Request, res: Response) {
     try {
-      const status = this.whatsappService.getStatus();
+      const { sessionName = 'default' } = req.query;
+      const status = await this.whatsappService.getStatus(sessionName as string);
       
       res.json({
         success: true,
@@ -41,19 +64,27 @@ export class WhatsAppController {
       logger.error('Erro ao obter status do WhatsApp:', error);
       res.status(500).json({
         success: false,
-        error: 'Erro ao obter status do WhatsApp'
+        error: 'Erro ao obter status'
       });
     }
   }
 
   async stopSession(req: Request, res: Response) {
     try {
-      await this.whatsappService.stopSession();
+      const { sessionName = 'default' } = req.query;
+      const success = await this.whatsappService.stopSession(sessionName as string);
       
-      res.json({
-        success: true,
-        message: 'Sessão WhatsApp encerrada'
-      });
+      if (success) {
+        res.json({
+          success: true,
+          message: 'Sessão WhatsApp encerrada'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Erro ao encerrar sessão'
+        });
+      }
     } catch (error) {
       logger.error('Erro ao encerrar sessão WhatsApp:', error);
       res.status(500).json({
@@ -65,18 +96,12 @@ export class WhatsAppController {
 
   async sendText(req: Request, res: Response) {
     try {
-      const { to, text } = req.body;
+      const { to, text } = sendMessageSchema.parse(req.body);
+      const { sessionName = 'default' } = req.query;
       
-      if (!to || !text) {
-        return res.status(400).json({
-          success: false,
-          error: 'Número de destino e texto são obrigatórios'
-        });
-      }
-
-      const result = await this.whatsappService.sendText(to, text);
+      const success = await this.whatsappService.sendText(sessionName as string, to, text);
       
-      if (result) {
+      if (success) {
         res.json({
           success: true,
           message: 'Mensagem enviada com sucesso'
@@ -98,18 +123,12 @@ export class WhatsAppController {
 
   async sendFile(req: Request, res: Response) {
     try {
-      const { to, filePath, caption } = req.body;
+      const { to, filePath, caption } = sendFileSchema.parse(req.body);
+      const { sessionName = 'default' } = req.query;
       
-      if (!to || !filePath) {
-        return res.status(400).json({
-          success: false,
-          error: 'Número de destino e caminho do arquivo são obrigatórios'
-        });
-      }
-
-      const result = await this.whatsappService.sendFile(to, filePath, caption);
+      const success = await this.whatsappService.sendFile(sessionName as string, to, filePath, caption);
       
-      if (result) {
+      if (success) {
         res.json({
           success: true,
           message: 'Arquivo enviado com sucesso'
@@ -129,35 +148,78 @@ export class WhatsAppController {
     }
   }
 
-  async sendAudio(req: Request, res: Response) {
+  async getSessions(req: Request, res: Response) {
     try {
-      const { to, audioPath } = req.body;
+      const sessions = await this.whatsappService.getSessions();
       
-      if (!to || !audioPath) {
+      res.json({
+        success: true,
+        data: sessions
+      });
+    } catch (error) {
+      logger.error('Erro ao buscar sessões:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erro ao buscar sessões'
+      });
+    }
+  }
+
+  async deleteSession(req: Request, res: Response) {
+    try {
+      const { sessionName } = req.params;
+      
+      if (!sessionName) {
         return res.status(400).json({
           success: false,
-          error: 'Número de destino e caminho do áudio são obrigatórios'
+          error: 'Nome da sessão é obrigatório'
         });
       }
 
-      const result = await this.whatsappService.sendAudio(to, audioPath);
+      const success = await this.whatsappService.deleteSession(sessionName);
       
-      if (result) {
+      if (success) {
         res.json({
           success: true,
-          message: 'Áudio enviado com sucesso'
+          message: 'Sessão removida com sucesso'
         });
       } else {
         res.status(500).json({
           success: false,
-          error: 'Erro ao enviar áudio'
+          error: 'Erro ao remover sessão'
         });
       }
     } catch (error) {
-      logger.error('Erro ao enviar áudio:', error);
+      logger.error('Erro ao remover sessão:', error);
       res.status(500).json({
         success: false,
-        error: 'Erro ao enviar áudio'
+        error: 'Erro ao remover sessão'
+      });
+    }
+  }
+
+  async getMessages(req: Request, res: Response) {
+    try {
+      const { sessionName = 'default' } = req.query;
+      const { limit = '50', offset = '0' } = req.query;
+      
+      // Buscar mensagens do banco
+      const messages = await this.whatsappService.prisma.whatsAppMessage.findMany({
+        where: { sessionName: sessionName as string },
+        orderBy: { timestamp: 'desc' },
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string)
+      });
+      
+      res.json({
+        success: true,
+        data: messages
+      });
+    } catch (error) {
+      logger.error('Erro ao buscar mensagens:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erro ao buscar mensagens'
       });
     }
   }

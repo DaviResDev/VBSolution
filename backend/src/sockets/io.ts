@@ -97,6 +97,60 @@ export function createSocketIO(httpServer: HTTPServer) {
     });
   });
 
+  // Namespace para WhatsApp
+  const whatsappNamespace = io.of('/whatsapp');
+
+  whatsappNamespace.on('connection', (socket: AuthenticatedSocket) => {
+    logger.info('Cliente conectado ao namespace WhatsApp', {
+      socketId: socket.id,
+      userId: socket.user?.id
+    });
+
+    // Inscrever em sala de sessão WhatsApp
+    socket.on('whatsapp:subscribe', (data: { sessionName: string }) => {
+      try {
+        const { sessionName } = data;
+        
+        // Sair de todas as salas anteriores
+        socket.rooms.forEach(room => {
+          if (room !== socket.id) {
+            socket.leave(room);
+          }
+        });
+
+        // Entrar na sala da sessão WhatsApp
+        const roomName = `whatsapp-${sessionName}`;
+        socket.join(roomName);
+        
+        logger.info('Cliente inscrito em sala WhatsApp', {
+          socketId: socket.id,
+          sessionName,
+          roomName
+        });
+
+        // Confirmar inscrição
+        socket.emit('whatsapp:subscribed', { sessionName, roomName });
+      } catch (error) {
+        logger.error('Erro ao inscrever em sala WhatsApp:', error);
+        socket.emit('whatsapp:error', { error: 'Erro ao inscrever em sala' });
+      }
+    });
+
+    // Desconexão
+    socket.on('disconnect', (reason) => {
+      logger.info('Cliente desconectado do namespace WhatsApp', {
+        socketId: socket.id,
+        userId: socket.user?.id,
+        reason
+      });
+    });
+
+    // Erro de conexão
+    socket.on('error', (error) => {
+      logger.error('Erro no Socket.IO WhatsApp:', error);
+    });
+  });
+
   // Log de eventos do Socket.IO
   io.engine.on('connection_error', (err) => {
     logger.error('Erro de conexão Socket.IO:', err);
