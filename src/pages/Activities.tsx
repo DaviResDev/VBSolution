@@ -1,29 +1,32 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useVB } from '@/contexts/VBContext';
-import { Plus, Search, ChevronDown, Settings, Filter, List, Calendar, Clock, BarChart3, Kanban } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { useActivities } from '@/hooks/useActivities';
 import { toast } from '@/hooks/use-toast';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import ResponsibleFilter from '@/components/ResponsibleFilter';
-import CompactAdvancedFilters from '@/components/CompactAdvancedFilters';
 import PageLayout from '@/components/PageLayout';
-
-// Import the view components
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import BitrixActivityForm from '@/components/BitrixActivityForm';
 import ActivityListView from '@/components/ActivityListView';
+import ActivityDeadlineView from '@/components/ActivityDeadlineView';
 import ActivityPlannerView from '@/components/ActivityPlannerView';
 import ActivityCalendarView from '@/components/ActivityCalendarView';
-import ActivityDeadlineView from '@/components/ActivityDeadlineView';
 import ActivityDashboardView from '@/components/ActivityDashboardView';
-import BitrixActivityForm from '@/components/BitrixActivityForm';
+import { TestLocalStorage } from '@/components/TestLocalStorage';
+import { 
+  List, 
+  Clock, 
+  Calendar, 
+  BarChart3, 
+  Kanban 
+} from 'lucide-react';
+import CompactAdvancedFilters from '@/components/CompactAdvancedFilters';
+import ResponsibleFilter from '@/components/ResponsibleFilter';
 
 const Activities = () => {
-  const { state, dispatch } = useVB();
-  const { activities, companies, employees } = state;
+  const { state } = useVB();
+  const { companies, employees } = state;
+  const { activities, loading, error, createActivity, updateActivity, deleteActivity, refetch } = useActivities();
   const [viewMode, setViewMode] = useState<'lista' | 'prazo' | 'planejador' | 'calendario' | 'dashboard'>('lista');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResponsibles, setSelectedResponsibles] = useState<string[]>([]);
@@ -33,108 +36,192 @@ const Activities = () => {
   const [selectedProject, setSelectedProject] = useState('');
   const navigate = useNavigate();
 
-  const updateActivityStatus = (activityId: string, newStatus: string) => {
+  const updateActivityStatus = async (activityId: string, newStatus: string) => {
     const activity = activities.find(a => a.id === activityId);
     if (activity) {
-      const updatedActivity = {
-        ...activity,
-        status: newStatus as any,
-        completedAt: newStatus === 'completed' ? new Date().toISOString() : activity.completedAt
-      };
-      dispatch({ type: 'UPDATE_ACTIVITY', payload: updatedActivity });
-
-      if (newStatus === 'completed') {
-        const completedTaskInfo = {
-          id: activityId,
-          title: activity.title,
-          completedAt: new Date().toISOString(),
-          previousStatus: activity.status
+      try {
+        const updateData: any = {
+          status: newStatus as 'pending' | 'in_progress' | 'completed' | 'cancelled'
         };
 
-        const completedTasks = JSON.parse(localStorage.getItem('completedTasks') || '[]');
-        completedTasks.push(completedTaskInfo);
-        localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+        // Adicionar completed_at apenas se o status for 'completed'
+        if (newStatus === 'completed') {
+          updateData.completed_at = new Date().toISOString();
+        }
+
+        const result = await updateActivity(activityId, updateData);
+        
+        if (result) {
+          if (newStatus === 'completed') {
+            const completedTaskInfo = {
+              id: activityId,
+              title: activity.title,
+              completedAt: new Date().toISOString(),
+              previousStatus: activity.status
+            };
+
+            const completedTasks = JSON.parse(localStorage.getItem('completedTasks') || '[]');
+            completedTasks.push(completedTaskInfo);
+            localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+          }
+
+          const statusNames = {
+            pending: 'Pendente',
+            'in_progress': 'Em Andamento',
+            completed: 'Finalizado',
+            cancelled: 'Cancelado'
+          };
+
+          toast({
+            title: "Status atualizado",
+            description: `Atividade movida para ${statusNames[newStatus as keyof typeof statusNames]}`
+          });
+          
+          // Atualizar a lista automaticamente
+          refetch();
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar status da atividade",
+          variant: "destructive"
+        });
       }
+    }
+  };
 
-      const statusNames = {
-        backlog: 'Backlog',
-        pending: 'Pendente',
-        'in-progress': 'Em Andamento',
-        completed: 'Finalizado',
-        overdue: 'Atrasado'
-      };
-
+  const handleDeleteActivities = async (activityIds: string[]) => {
+    try {
+      for (const id of activityIds) {
+        const success = await deleteActivity(id);
+        if (!success) {
+          throw new Error(`Falha ao excluir atividade ${id}`);
+        }
+      }
+      
       toast({
-        title: "Status atualizado",
-        description: `Atividade movida para ${statusNames[newStatus as keyof typeof statusNames]}`
+        title: "Atividades excluídas",
+        description: `${activityIds.length} atividade(s) foram excluídas com sucesso.`
+      });
+      
+      // Atualizar a lista automaticamente
+      refetch();
+    } catch (error) {
+      console.error('Erro ao excluir atividades:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir atividades",
+        variant: "destructive"
       });
     }
   };
 
-  const handleDeleteActivities = (activityIds: string[]) => {
-    activityIds.forEach(id => {
-      dispatch({ type: 'DELETE_ACTIVITY', payload: id });
-    });
-    toast({
-      title: "Atividades excluídas",
-      description: `${activityIds.length} atividade(s) foram excluídas com sucesso.`
-    });
-  };
-
-  const handleArchiveActivity = (activityId: string) => {
-    dispatch({ type: 'ARCHIVE_ACTIVITY', payload: activityId });
-    toast({
-      title: 'Atividade arquivada',
-      description: 'A atividade foi movida para os arquivos.'
-    });
+  const handleArchiveActivity = async (activityId: string) => {
+    try {
+      const result = await updateActivity(activityId, { status: 'cancelled' });
+      
+      if (result) {
+        toast({
+          title: 'Atividade arquivada',
+          description: 'A atividade foi movida para os arquivos.'
+        });
+        
+        // Atualizar a lista automaticamente
+        refetch();
+      }
+    } catch (error) {
+      console.error('Erro ao arquivar atividade:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao arquivar atividade",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleActivityClick = (activityId: string) => {
     navigate(`/activities/${activityId}`);
   };
 
-  const handleCreateActivity = (formData: any) => {
-    const newActivity = {
-      id: Date.now().toString(),
-      title: formData.title,
-      description: formData.description,
-      date: new Date(formData.date),
-      priority: formData.priority as 'high' | 'medium' | 'low',
-      responsibleId: formData.responsibleId,
-      companyId: formData.companyId,
-      projectId: formData.projectId !== 'none' ? formData.projectId : undefined,
-      workGroup: formData.workGroup,
-      department: formData.department,
-      type: formData.type as 'call' | 'meeting' | 'task' | 'other',
-      status: 'backlog' as const,
-      createdAt: new Date()
-    };
-    dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
-    toast({
-      title: "Tarefa criada",
-      description: "Nova tarefa foi criada com sucesso"
-    });
-    setIsCreateModalOpen(false);
+  const handleCreateActivity = async (formData: any) => {
+    try {
+      console.log('📝 Dados do formulário recebidos:', formData);
+      
+      const activityData = {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type as 'task' | 'meeting' | 'call' | 'email' | 'other',
+        priority: formData.priority as 'low' | 'medium' | 'high' | 'urgent',
+        status: 'pending' as const,
+        due_date: formData.date ? new Date(formData.date).toISOString() : undefined,
+        responsible_id: formData.responsibleId || undefined
+      };
+
+      console.log('🚀 Dados da atividade preparados:', activityData);
+
+      const result = await createActivity(activityData);
+      
+      if (result) {
+        console.log('✅ Atividade criada com sucesso:', result);
+        toast({
+          title: "Tarefa criada",
+          description: "Nova tarefa foi criada com sucesso"
+        });
+        setIsCreateModalOpen(false);
+        // Atualizar a lista automaticamente
+        refetch();
+      } else {
+        console.error('❌ Falha ao criar atividade');
+        toast({
+          title: "Erro",
+          description: "Erro ao criar tarefa",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro inesperado ao criar atividade:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao criar tarefa",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleCreateQuickTask = (title: string, status: string) => {
-    const newActivity = {
-      id: Date.now().toString(),
-      title,
-      description: '',
-      date: new Date(),
-      priority: 'medium' as const,
-      responsibleId: employees[0]?.id || '',
-      companyId: '',
-      type: 'task' as const,
-      status: status as 'backlog' | 'pending' | 'in-progress' | 'completed' | 'overdue',
-      createdAt: new Date()
-    };
-    dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
+  const handleCreateQuickTask = async (title: string, status: string) => {
+    try {
+      const activityData = {
+        title,
+        description: '',
+        type: 'task' as const,
+        priority: 'medium' as const,
+        status: status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
+        responsible_id: employees.length > 0 ? employees[0].id : undefined
+      };
+
+      const result = await createActivity(activityData);
+      
+      if (result) {
+        toast({
+          title: "Tarefa rápida criada",
+          description: "Nova tarefa foi criada com sucesso"
+        });
+        // Atualizar a lista automaticamente
+        refetch();
+      }
+    } catch (error) {
+      console.error('Erro ao criar tarefa rápida:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar tarefa rápida",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleViewModeChange = (value: string) => {
-    setViewMode(value as any);
+    setViewMode(value as 'lista' | 'prazo' | 'planejador' | 'calendario' | 'dashboard');
   };
 
   const handleOpenCreateModal = () => {
@@ -145,19 +232,27 @@ const Activities = () => {
     let filtered = activities;
     
     if (selectedResponsibles.length > 0) {
-      filtered = filtered.filter(activity => selectedResponsibles.includes(activity.responsibleId));
+      filtered = filtered.filter(activity => 
+        activity.responsible_id && selectedResponsibles.includes(activity.responsible_id)
+      );
     }
     
     if (selectedWorkGroup) {
-      filtered = filtered.filter(activity => activity.workGroup === selectedWorkGroup);
+      filtered = filtered.filter(activity => 
+        activity.work_group === selectedWorkGroup
+      );
     }
     
     if (selectedDepartment) {
-      filtered = filtered.filter(activity => activity.department === selectedDepartment);
+      filtered = filtered.filter(activity => 
+        activity.department === selectedDepartment
+      );
     }
     
     if (selectedProject) {
-      filtered = filtered.filter(activity => activity.projectId === selectedProject);
+      filtered = filtered.filter(activity => 
+        activity.project_id === selectedProject
+      );
     }
     
     return filtered;
@@ -264,6 +359,62 @@ const Activities = () => {
     </>
   );
 
+  // Tratamento de erro
+  if (error) {
+    return (
+      <PageLayout
+        title="Minhas Tarefas"
+        tabs={tabs}
+        onTabChange={handleViewModeChange}
+        activeTab={viewMode}
+        onCreateClick={handleOpenCreateModal}
+        createButtonText="Criar Tarefa"
+        searchPlaceholder="Buscar atividades..."
+        onSearch={setSearchTerm}
+        searchValue={searchTerm}
+        filters={filters}
+        showSearch={viewMode === 'lista' || viewMode === 'prazo' || viewMode === 'planejador'}
+      >
+        <div className="flex flex-col items-center justify-center p-8 text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Erro ao carregar atividades</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={refetch} variant="outline">
+            Tentar novamente
+          </Button>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <PageLayout
+        title="Minhas Tarefas"
+        tabs={tabs}
+        onTabChange={handleViewModeChange}
+        activeTab={viewMode}
+        onCreateClick={handleOpenCreateModal}
+        createButtonText="Criar Tarefa"
+        searchPlaceholder="Buscar atividades..."
+        onSearch={setSearchTerm}
+        searchValue={searchTerm}
+        filters={filters}
+        showSearch={viewMode === 'lista' || viewMode === 'prazo' || viewMode === 'planejador'}
+      >
+        <div className="flex flex-col items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Carregando suas tarefas...</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
     <>
       <PageLayout
@@ -280,6 +431,11 @@ const Activities = () => {
         showSearch={viewMode === 'lista' || viewMode === 'prazo' || viewMode === 'planejador'}
       >
         {renderCurrentView()}
+        
+        {/* Componente de teste temporário - comentado para evitar problemas */}
+        {/* <div className="mt-8">
+          <TestLocalStorage />
+        </div> */}
       </PageLayout>
 
       {/* Create Modal */}

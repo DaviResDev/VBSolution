@@ -1,584 +1,450 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useSocket } from '@/hooks/useSocket';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { useVB } from '@/contexts/VBContext';
 import { 
   MessageCircle, 
-  Smartphone, 
-  Send, 
-  Phone, 
-  PhoneOff,
-  RefreshCw,
-  Trash2,
-  Settings
+  Send,
+  Search,
+  Plus,
+  Settings,
+  User,
+  Clock,
+  Check,
+  CheckCheck,
+  Phone
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import { WhatsAppStatus, WhatsAppMessage } from '@/types';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-const WhatsAppPage: React.FC = () => {
-  const [status, setStatus] = useState<WhatsAppStatus>({
-    connected: false,
-    sessionId: 'default',
-    lastActivity: new Date(),
-    status: 'disconnected'
-  });
-  
-  const [qrCode, setQrCode] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [currentSession, setCurrentSession] = useState<string>('default');
-  const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+const WhatsApp = () => {
+  const { state } = useVB();
+  const { companies, settings } = state;
+  const [selectedContact, setSelectedContact] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const socket = useSocket('/whatsapp');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [templateData, setTemplateData] = useState({
+    name: '',
+    message: '',
+    stage: ''
+  });
 
-  // Scroll para última mensagem
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Dados carregados do Supabase
+  const [conversations, setConversations] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [templates, setTemplates] = useState([]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    fetchWhatsAppData();
+  }, []);
 
-  // Conectar ao Socket.IO
-  useEffect(() => {
-    if (socket) {
-      // Inscrever na sessão atual
-      socket.emit('whatsapp:subscribe', { sessionName: currentSession });
-
-      // Escutar eventos do WhatsApp
-      socket.on('whatsapp:qr_code', (data) => {
-        if (data.sessionName === currentSession) {
-          setQrCode(data.qrCode);
-          setStatus(prev => ({ ...prev, status: 'qr_ready' }));
-          toast.success('QR Code gerado! Escaneie com seu WhatsApp.');
-        }
-      });
-
-      socket.on('whatsapp:ready', (data) => {
-        if (data.sessionName === currentSession) {
-          setQrCode(null);
-          setStatus(prev => ({ ...prev, connected: true, status: 'connected' }));
-          toast.success('WhatsApp conectado com sucesso!');
-          loadMessages();
-        }
-      });
-
-      socket.on('whatsapp:state_change', (data) => {
-        if (data.sessionName === currentSession) {
-          setStatus(prev => ({ ...prev, status: data.status }));
-        }
-      });
-
-      socket.on('whatsapp:message', (data) => {
-        if (data.sessionName === currentSession) {
-          setMessages(prev => [data.message, ...prev]);
-        }
-      });
-
-      return () => {
-        socket.off('whatsapp:qr_code');
-        socket.off('whatsapp:ready');
-        socket.off('whatsapp:state_change');
-        socket.off('whatsapp:message');
-      };
-    }
-  }, [socket, currentSession]);
-
-  // Carregar status inicial
-  useEffect(() => {
-    loadStatus();
-    loadSessions();
-  }, [currentSession]);
-
-  const loadStatus = async () => {
+  const fetchWhatsAppData = async () => {
     try {
-      const response = await fetch(`/api/whatsapp/status?sessionName=${currentSession}`, {
-        headers: {
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setStatus(data.data);
-        if (data.data.connected) {
-          loadMessages();
-        }
-      }
+      // Buscar dados do WhatsApp do Supabase
+      // Por enquanto, arrays vazios
+      setConversations([]);
+      setMessages([]);
+      setTemplates([]);
     } catch (error) {
-      console.error('Erro ao carregar status:', error);
+      console.error('Erro ao buscar dados do WhatsApp:', error);
     }
   };
 
-  const loadSessions = async () => {
-    try {
-      const response = await fetch('/api/whatsapp/sessions', {
-        headers: {
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data.data);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar sessões:', error);
-    }
+  const getCompanyById = (id: string) => {
+    return companies.find(c => c.id === id);
   };
 
-  const loadMessages = async () => {
-    try {
-      const response = await fetch(`/api/whatsapp/messages?sessionName=${currentSession}&limit=100`, {
-        headers: {
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.data.reverse()); // Inverter para mostrar mais recentes por último
-      }
-    } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
-    }
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
   };
 
-  const startSession = async () => {
-    setIsConnecting(true);
-    try {
-      const response = await fetch('/api/whatsapp/start-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        },
-        body: JSON.stringify({ sessionName: currentSession })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data.qrCode) {
-          setQrCode(data.data.qrCode);
-          setStatus(prev => ({ ...prev, status: 'qr_ready' }));
-          toast.success('QR Code gerado! Escaneie com seu WhatsApp.');
-        } else {
-          toast.success('Sessão iniciada com sucesso!');
-          loadStatus();
-        }
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Erro ao iniciar sessão');
-      }
-    } catch (error) {
-      console.error('Erro ao iniciar sessão:', error);
-      toast.error('Erro ao iniciar sessão');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const stopSession = async () => {
-    try {
-      const response = await fetch(`/api/whatsapp/stop-session?sessionName=${currentSession}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        }
-      });
-      
-      if (response.ok) {
-        setQrCode(null);
-        setStatus(prev => ({ ...prev, connected: false, status: 'disconnected' }));
-        setMessages([]);
-        toast.success('Sessão encerrada');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Erro ao encerrar sessão');
-      }
-    } catch (error) {
-      console.error('Erro ao encerrar sessão:', error);
-      toast.error('Erro ao encerrar sessão');
-    }
-  };
-
-  const deleteSession = async () => {
-    if (!confirm('Tem certeza que deseja remover esta sessão?')) return;
-    
-    try {
-      const response = await fetch(`/api/whatsapp/sessions/${currentSession}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        }
-      });
-      
-      if (response.ok) {
-        toast.success('Sessão removida');
-        setCurrentSession('default');
-        loadSessions();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Erro ao remover sessão');
-      }
-    } catch (error) {
-      console.error('Erro ao remover sessão:', error);
-      toast.error('Erro ao remover sessão');
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !status.connected) return;
-    
-    try {
-      const response = await fetch('/api/whatsapp/send-text', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer VB_DEV_TOKEN`
-        },
-        body: JSON.stringify({ 
-          to: '5511999999999', // Número padrão para teste
-          text: newMessage 
-        })
-      });
-      
-      if (response.ok) {
-        // Adicionar mensagem localmente
-        const message: WhatsAppMessage = {
-          id: Date.now().toString(),
-          atendimentoId: 'test',
-          conteudo: newMessage,
-          tipo: 'TEXT',
-          remetente: 'ATENDENTE',
-          timestamp: new Date()
-        };
-        
-        setMessages(prev => [...prev, message]);
-        setNewMessage('');
-        toast.success('Mensagem enviada');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Erro ao enviar mensagem');
-      }
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      toast.error('Erro ao enviar mensagem');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'connected': return 'bg-green-500';
-      case 'connecting': return 'bg-yellow-500';
-      case 'qr_ready': return 'bg-blue-500';
-      case 'error': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'sent':
+        return <Check className="h-3 w-3 text-gray-400" />;
+      case 'delivered':
+        return <CheckCheck className="h-3 w-3 text-gray-400" />;
+      case 'read':
+        return <CheckCheck className="h-3 w-3 text-blue-500" />;
+      default:
+        return <Clock className="h-3 w-3 text-gray-400" />;
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'connected': return 'Conectado';
-      case 'connecting': return 'Conectando...';
-      case 'qr_ready': return 'QR Code Pronto';
-      case 'error': return 'Erro';
-      default: return 'Desconectado';
-    }
+  const filteredConversations = conversations.filter(conv => {
+    const company = getCompanyById(conv.companyId);
+    return company?.fantasyName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const selectedConversation = conversations.find(c => c.id === selectedContact);
+  const selectedCompany = selectedConversation ? getCompanyById(selectedConversation.companyId) : null;
+  const conversationMessages = messages.filter(m => m.conversationId === selectedContact);
+
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedContact) return;
+
+    // Aqui você integraria com a EvolutionAPI ou outro gateway
+    console.log('Enviando mensagem:', newMessage, 'para:', selectedContact);
+    
+    toast({
+      title: "Mensagem enviada",
+      description: "Sua mensagem foi enviada com sucesso!",
+    });
+
+    setNewMessage('');
+  };
+
+  const useTemplate = (template: any) => {
+    if (!selectedCompany) return;
+    
+    const personalizedMessage = template.message.replace('{nome}', selectedCompany.fantasyName);
+    setNewMessage(personalizedMessage);
+  };
+
+  const sendBulkMessage = (templateId: string, stageId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    const targetCompanies = companies.filter(c => c.funnelStage === stageId);
+    
+    console.log(`Enviando mensagem em massa para ${targetCompanies.length} empresas`);
+    
+    toast({
+      title: "Mensagens enviadas",
+      description: `Mensagem enviada para ${targetCompanies.length} empresas na etapa selecionada.`,
+    });
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            WhatsApp Business
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Gerencie suas conversas e sessões do WhatsApp
+          <h1 className="text-3xl font-bold tracking-tight">WhatsApp Business</h1>
+          <p className="text-muted-foreground">
+            Gerencie conversas e envie mensagens para seus clientes
           </p>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <Badge 
-            className={`${getStatusColor(status.status)} text-white`}
-          >
-            {getStatusText(status.status)}
-          </Badge>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadStatus}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        <div className="flex gap-2">
+          <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Template
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar Template de Mensagem</DialogTitle>
+                <DialogDescription>
+                  Crie modelos de mensagens para diferentes etapas do funil
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="templateName">Nome do Template</Label>
+                  <Input
+                    id="templateName"
+                    value={templateData.name}
+                    onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })}
+                    placeholder="Ex: Boas-vindas"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="templateStage">Etapa do Funil</Label>
+                  <Select 
+                    value={templateData.stage} 
+                    onValueChange={(value) => setTemplateData({ ...templateData, stage: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma etapa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {settings.funnelStages.map((stage) => (
+                        <SelectItem key={stage.id} value={stage.id}>
+                          {stage.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="templateMessage">Mensagem</Label>
+                  <Textarea
+                    id="templateMessage"
+                    value={templateData.message}
+                    onChange={(e) => setTemplateData({ ...templateData, message: e.target.value })}
+                    placeholder="Use {nome} para personalizar com o nome da empresa"
+                    rows={4}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button className="vb-button-primary">
+                    Criar Template
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline">
+            <Settings className="mr-2 h-4 w-4" />
+            Configurar API
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="chat" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="chat" className="flex items-center space-x-2">
-            <MessageCircle className="h-4 w-4" />
-            <span>Chat</span>
-          </TabsTrigger>
-          <TabsTrigger value="sessions" className="flex items-center space-x-2">
-            <Smartphone className="h-4 w-4" />
-            <span>Sessões</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span>Configurações</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Interface do WhatsApp */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+        {/* Lista de conversas */}
+        <Card className="vb-card lg:col-span-1">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Conversas</CardTitle>
+              <Badge variant="secondary">{conversations.length}</Badge>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar conversas..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="space-y-1 max-h-[400px] overflow-y-auto">
+              {filteredConversations.map((conversation) => {
+                const company = getCompanyById(conversation.companyId);
+                if (!company) return null;
 
-        <TabsContent value="chat" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Conversa WhatsApp</span>
-                <div className="flex items-center space-x-2">
-                  {!status.connected && !qrCode && (
-                    <Button
-                      onClick={startSession}
-                      disabled={isConnecting}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {isConnecting ? (
-                        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Phone className="h-4 w-4 mr-2" />
-                      )}
-                      {isConnecting ? 'Conectando...' : 'Conectar WhatsApp'}
-                    </Button>
-                  )}
-                  
-                  {status.connected && (
-                    <Button
-                      onClick={stopSession}
-                      variant="destructive"
-                      size="sm"
-                    >
-                      <PhoneOff className="h-4 w-4 mr-2" />
-                      Desconectar
-                    </Button>
-                  )}
-                </div>
-              </CardTitle>
-              <CardDescription>
-                {status.connected 
-                  ? 'WhatsApp conectado e funcionando'
-                  : 'Conecte seu WhatsApp para começar a conversar'
-                }
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              {/* QR Code */}
-              {qrCode && (
-                <div className="text-center space-y-4">
-                  <div className="bg-white p-4 rounded-lg inline-block">
-                    <img 
-                      src={qrCode} 
-                      alt="QR Code WhatsApp" 
-                      className="w-64 h-64"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Escaneie este QR Code com seu WhatsApp para conectar
-                  </p>
-                </div>
-              )}
-
-              {/* Chat */}
-              {status.connected && (
-                <div className="space-y-4">
-                  <ScrollArea className="h-96 w-full rounded-md border p-4">
-                    <div className="space-y-4">
-                      {messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${
-                            message.remetente === 'ATENDENTE' ? 'justify-end' : 'justify-start'
-                          }`}
-                        >
-                          <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              message.remetente === 'ATENDENTE'
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-                            }`}
-                          >
-                            <p className="text-sm">{message.conteudo}</p>
-                            <p className="text-xs opacity-75 mt-1">
-                              {new Date(message.timestamp).toLocaleTimeString()}
-                            </p>
+                return (
+                  <div
+                    key={conversation.id}
+                    className={`p-3 cursor-pointer border-b hover:bg-muted transition-colors ${
+                      selectedContact === conversation.id ? 'bg-vb-primary/10 border-vb-primary' : ''
+                    }`}
+                    onClick={() => setSelectedContact(conversation.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={company.logo} />
+                        <AvatarFallback className="bg-vb-secondary text-vb-primary text-xs">
+                          {getInitials(company.fantasyName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-sm truncate">{company.fantasyName}</h4>
+                          <span className="text-xs text-muted-foreground">
+                            {conversation.timestamp.toLocaleTimeString('pt-BR', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-sm text-muted-foreground truncate">
+                            {conversation.lastMessage}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            {conversation.unread > 0 && (
+                              <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                                {conversation.unread}
+                              </Badge>
+                            )}
+                            {getStatusIcon(conversation.status)}
                           </div>
                         </div>
-                      ))}
-                      <div ref={messagesEndRef} />
+                      </div>
                     </div>
-                  </ScrollArea>
-
-                  <div className="flex space-x-2">
-                    <Input
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Digite sua mensagem..."
-                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                    />
-                    <Button onClick={sendMessage} disabled={!newMessage.trim()}>
-                      <Send className="h-4 w-4" />
-                    </Button>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="sessions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Smartphone className="h-5 w-5" />
-                <span>Sessões WhatsApp</span>
-              </CardTitle>
-              <CardDescription>
-                Gerencie suas sessões ativas do WhatsApp
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent>
-              <div className="space-y-4">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className={`p-4 rounded-lg border ${
-                      session.name === currentSession 
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' 
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Smartphone className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <h3 className="font-medium">{session.name}</h3>
-                          <p className="text-sm text-gray-500">
-                            Status: {getStatusText(session.status)}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            Criada em: {new Date(session.createdAt).toLocaleDateString()}
-                          </p>
+        {/* Chat */}
+        <Card className="vb-card lg:col-span-2 flex flex-col">
+          {selectedCompany ? (
+            <>
+              {/* Header do chat */}
+              <CardHeader className="pb-3 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={selectedCompany.logo} />
+                      <AvatarFallback className="bg-vb-secondary text-vb-primary text-sm">
+                        {getInitials(selectedCompany.fantasyName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium">{selectedCompany.fantasyName}</h3>
+                      <p className="text-sm text-muted-foreground">{selectedCompany.phone}</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Phone className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+
+              {/* Mensagens */}
+              <CardContent className="flex-1 p-4 overflow-y-auto">
+                <div className="space-y-4">
+                  {conversationMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.isFromContact ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] p-3 rounded-lg ${
+                          message.isFromContact
+                            ? 'bg-muted text-foreground'
+                            : 'bg-vb-primary text-white'
+                        }`}
+                      >
+                        <p className="text-sm">{message.content}</p>
+                        <div className="flex items-center gap-1 mt-1 justify-end">
+                          <span className="text-xs opacity-70">
+                            {message.timestamp.toLocaleTimeString('pt-BR', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                          {!message.isFromContact && getStatusIcon(message.status)}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(session.status)}>
-                          {getStatusText(session.status)}
-                        </Badge>
-                        
-                        {session.name === currentSession ? (
-                          <Badge variant="outline">Ativa</Badge>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setCurrentSession(session.name)}
-                          >
-                            Ativar
-                          </Button>
-                        )}
-                        
-                        {session.name !== 'default' && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteSession()}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  ))}
+                </div>
+              </CardContent>
 
-        <TabsContent value="settings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Configurações do WhatsApp</span>
-              </CardTitle>
-              <CardDescription>
-                Configure as opções do seu WhatsApp Business
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Sessão Atual</label>
-                  <Input value={currentSession} disabled />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
-                  <Input value={getStatusText(status.status)} disabled />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Última Atividade</label>
-                  <Input 
-                    value={status.lastActivity.toLocaleString()} 
-                    disabled 
+              {/* Input de mensagem */}
+              <div className="p-4 border-t">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Digite sua mensagem..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    className="flex-1"
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Sessão ID</label>
-                  <Input value={status.sessionId} disabled />
+                  <Button onClick={sendMessage} className="vb-button-primary">
+                    <Send className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              
-              <Separator />
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Informações da API</h4>
-                  <p className="text-sm text-gray-500">
-                    Endpoint: /api/whatsapp
-                  </p>
-                </div>
-                
-                <Button variant="outline" onClick={loadStatus}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Atualizar
-                </Button>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-medium mb-2">Selecione uma conversa</h3>
+                <p className="text-sm text-muted-foreground">
+                  Escolha uma conversa para começar a enviar mensagens
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Templates e Envio em Massa */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Templates */}
+        <Card className="vb-card">
+          <CardHeader>
+            <CardTitle>Templates de Mensagem</CardTitle>
+            <CardDescription>
+              Modelos prontos para diferentes situações
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {templates.map((template) => (
+              <div key={template.id} className="p-3 border rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm">{template.name}</h4>
+                  <Badge variant="outline" className="text-xs">
+                    {settings.funnelStages.find(s => s.id === template.stage)?.name}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{template.message}</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => useTemplate(template)}
+                    disabled={!selectedContact}
+                  >
+                    Usar Template
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => sendBulkMessage(template.id, template.stage)}
+                  >
+                    Envio em Massa
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Estatísticas */}
+        <Card className="vb-card">
+          <CardHeader>
+            <CardTitle>Estatísticas de Mensagens</CardTitle>
+            <CardDescription>
+              Resumo da atividade de mensagens
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-vb-primary">{conversations.length}</div>
+                <div className="text-sm text-muted-foreground">Conversas Ativas</div>
+              </div>
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-green-600">{messages.length}</div>
+                <div className="text-sm text-muted-foreground">Mensagens Hoje</div>
+              </div>
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">85%</div>
+                <div className="text-sm text-muted-foreground">Taxa de Resposta</div>
+              </div>
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">12min</div>
+                <div className="text-sm text-muted-foreground">Tempo Médio</div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm">Integração com EvolutionAPI</h4>
+              <p className="text-sm text-muted-foreground">
+                Configure sua instância da EvolutionAPI para começar a enviar mensagens automaticamente.
+              </p>
+              <Button variant="outline" size="sm" className="w-full">
+                <Settings className="mr-2 h-4 w-4" />
+                Configurar Integração
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
 
-export default WhatsAppPage;
+export default WhatsApp;

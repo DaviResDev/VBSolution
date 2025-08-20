@@ -45,47 +45,10 @@ type ProjectAction =
   | { type: 'SET_DEPARTMENTS'; payload: string[] };
 
 const initialState: ProjectState = {
-  projects: [
-    {
-      id: '1',
-      name: 'Sistema de CRM',
-      description: 'Desenvolvimento completo do sistema de CRM para gestão de clientes',
-      responsible: 'João Silva',
-      company: 'TechCorp',
-      tags: ['desenvolvimento', 'sistema', 'crm'],
-      status: 'Em Andamento',
-      createdAt: '2024-01-15',
-      dueDate: '2024-03-15',
-      tasks: [],
-      workGroup: 'Desenvolvimento',
-      department: 'TI',
-      archived: false
-    },
-    {
-      id: '2',
-      name: 'Campanha Marketing Digital',
-      description: 'Campanha completa de marketing digital para novos produtos',
-      responsible: 'Maria Santos',
-      company: 'MarketingPro',
-      tags: ['marketing', 'digital', 'campanha'],
-      status: 'Planejado',
-      createdAt: '2024-01-20',
-      dueDate: '2024-02-28',
-      tasks: [],
-      workGroup: 'Marketing',
-      department: 'Comercial',
-      archived: false
-    }
-  ],
-  projectStages: [
-    { id: '1', name: 'Backlog', order: 1, color: 'bg-gray-100' },
-    { id: '2', name: 'Pendente', order: 2, color: 'bg-yellow-100' },
-    { id: '3', name: 'Em Andamento', order: 3, color: 'bg-blue-100' },
-    { id: '4', name: 'Finalizado', order: 4, color: 'bg-green-100' },
-    { id: '5', name: 'Excluído', order: 5, color: 'bg-red-100' }
-  ],
-  workGroups: ['Desenvolvimento', 'Marketing', 'Vendas', 'Suporte', 'RH'],
-  departments: ['TI', 'Comercial', 'Financeiro', 'Recursos Humanos', 'Operações']
+  projects: [],
+  projectStages: [],
+  workGroups: [],
+  departments: []
 };
 
 function projectReducer(state: ProjectState, action: ProjectAction): ProjectState {

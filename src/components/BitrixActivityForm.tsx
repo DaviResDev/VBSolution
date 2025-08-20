@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectTrigger, SelectValue } from '@/components/
 import { SafeSelectItem } from '@/components/ui/safe-select-item';
 import { useProject } from '@/contexts/ProjectContext';
 import { createSafeSelectItems } from '@/utils/selectValidation';
+import { toast } from '@/hooks/use-toast';
 import { 
   Calendar, 
   User, 
@@ -46,21 +47,38 @@ const BitrixActivityForm = ({ companies, employees, onSubmit }: BitrixActivityFo
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.title && formData.responsibleId) {
-      onSubmit(formData);
-      setFormData({
-        title: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0],
-        priority: 'medium',
-        responsibleId: '',
-        companyId: '',
-        projectId: '',
-        workGroup: '',
-        department: '',
-        type: 'task'
+    
+    // Validação básica - apenas título é obrigatório
+    if (!formData.title.trim()) {
+      toast({
+        title: "Campo obrigatório",
+        description: "O título da atividade é obrigatório",
+        variant: "destructive",
       });
+      return;
     }
+
+    // Se não houver responsável selecionado, usar o primeiro funcionário disponível ou deixar vazio
+    const activityData = {
+      ...formData,
+      responsibleId: formData.responsibleId || (employees.length > 0 ? employees[0].id : '')
+    };
+
+    onSubmit(activityData);
+    
+    // Reset do formulário
+    setFormData({
+      title: '',
+      description: '',
+      date: new Date().toISOString().split('T')[0],
+      priority: 'medium',
+      responsibleId: '',
+      companyId: '',
+      projectId: '',
+      workGroup: '',
+      department: '',
+      type: 'task'
+    });
   };
 
   // Create safe select items with enhanced validation
@@ -101,7 +119,8 @@ const BitrixActivityForm = ({ companies, employees, onSubmit }: BitrixActivityFo
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'high': return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'urgent': return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'high': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
       case 'medium': return <Clock className="h-4 w-4 text-yellow-500" />;
       case 'low': return <CheckCircle className="h-4 w-4 text-green-500" />;
       default: return <Clock className="h-4 w-4 text-yellow-500" />;
@@ -113,6 +132,7 @@ const BitrixActivityForm = ({ companies, employees, onSubmit }: BitrixActivityFo
       case 'call': return <Phone className="h-4 w-4" />;
       case 'meeting': return <Video className="h-4 w-4" />;
       case 'task': return <FileText className="h-4 w-4" />;
+      case 'email': return <FileText className="h-4 w-4" />;
       case 'other': return <Target className="h-4 w-4" />;
       default: return <FileText className="h-4 w-4" />;
     }
@@ -193,8 +213,12 @@ const BitrixActivityForm = ({ companies, employees, onSubmit }: BitrixActivityFo
                 Média
               </SafeSelectItem>
               <SafeSelectItem value="high" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
                 Alta
+              </SafeSelectItem>
+              <SafeSelectItem value="urgent" className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                Urgente
               </SafeSelectItem>
             </SelectContent>
           </Select>
@@ -224,6 +248,10 @@ const BitrixActivityForm = ({ companies, employees, onSubmit }: BitrixActivityFo
               <SafeSelectItem value="call" className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
                 Ligação
+              </SafeSelectItem>
+              <SafeSelectItem value="email" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Email
               </SafeSelectItem>
               <SafeSelectItem value="other" className="flex items-center gap-2">
                 <Target className="h-4 w-4" />

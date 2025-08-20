@@ -1,9 +1,10 @@
 
 import { useLocation } from 'react-router-dom';
-import { Search, Bell, MessageCircle, User, Settings, Sun, Moon } from 'lucide-react';
+import { Search, Bell, MessageCircle, User, Settings, Sun, Moon, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,80 +28,16 @@ interface Notification {
   url?: string;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'activity',
-    title: 'Nova Atividade Criada',
-    message: 'Reunião com cliente ABC foi criada',
-    timestamp: '2 min atrás',
-    read: false,
-    url: '/activities'
-  },
-  {
-    id: '2',
-    type: 'project',
-    title: 'Projeto Atualizado',
-    message: 'Projeto "Dashboard Redesign" foi atualizado',
-    timestamp: '5 min atrás',
-    read: false,
-    url: '/projects'
-  },
-  {
-    id: '3',
-    type: 'lead',
-    title: 'Novo Lead Adicionado',
-    message: 'Lead "Empresa XYZ" foi adicionado ao sistema',
-    timestamp: '10 min atrás',
-    read: false,
-    url: '/leads-sales'
-  },
-  {
-    id: '4',
-    type: 'message',
-    title: 'Nova Mensagem',
-    message: 'João Silva enviou uma mensagem',
-    timestamp: '15 min atrás',
-    read: false,
-    url: '/chat'
-  }
-];
-
-const mockMessages: Notification[] = [
-  {
-    id: 'm1',
-    type: 'message',
-    title: 'João Silva',
-    message: 'Olá! Como está o projeto?',
-    timestamp: '2 min atrás',
-    read: false,
-    url: '/chat'
-  },
-  {
-    id: 'm2',
-    type: 'message',
-    title: 'Maria Santos',
-    message: 'Preciso de ajuda com o relatório',
-    timestamp: '5 min atrás',
-    read: false,
-    url: '/chat'
-  },
-  {
-    id: 'm3',
-    type: 'message',
-    title: 'Carlos Oliveira',
-    message: 'Reunião confirmada para amanhã',
-    timestamp: '10 min atrás',
-    read: true,
-    url: '/chat'
-  }
-];
+// Dados vazios - serão carregados do Supabase quando implementado
+const mockNotifications: Notification[] = [];
+const mockMessages: Notification[] = [];
 
 export function BitrixTopbar({
   sidebarExpanded = false
 }: BitrixTopbarProps) {
   const location = useLocation();
   const { topBarColor, isDarkMode, toggleDarkMode } = useTheme();
+  const { user, signOut } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [userLogo, setUserLogo] = useState<string | null>(null);
@@ -412,9 +349,9 @@ export function BitrixTopbar({
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 p-1 rounded-lg hover:bg-blue-800/30 transition-colors">
                 <Avatar className="h-6 w-6 border-2 border-white/20">
-                  <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=24&h=24&fit=crop&crop=face" alt="User" />
+                  <AvatarImage src={user?.user_metadata?.avatar_url} alt="User" />
                   <AvatarFallback className="bg-blue-600 text-white text-xs font-medium">
-                    JS
+                    {user?.user_metadata?.name ? user.user_metadata.name.substring(0, 2).toUpperCase() : 'U'}
                   </AvatarFallback>
                 </Avatar>
               </button>
@@ -423,14 +360,18 @@ export function BitrixTopbar({
               <div className="p-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face" alt="User" />
+                    <AvatarImage src={user?.user_metadata?.avatar_url} alt="User" />
                     <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
-                      JS
+                      {user?.user_metadata?.name ? user.user_metadata.name.substring(0, 2).toUpperCase() : 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">João Silva</p>
-                    <p className="text-xs text-gray-500">joao.silva@empresa.com</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.user_metadata?.name || 'Usuário'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {user?.email || 'usuario@email.com'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -457,6 +398,16 @@ export function BitrixTopbar({
               <DropdownMenuItem className="flex items-center gap-2 p-3 cursor-pointer hover:bg-gray-50">
                 <Settings className="h-4 w-4 text-gray-500" />
                 <span className="text-sm">Configurações</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuItem 
+                className="flex items-center gap-2 p-3 cursor-pointer hover:bg-red-50 text-red-600"
+                onClick={signOut}
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="text-sm">Sair</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,50 +47,25 @@ const Inventory = () => {
   const [showCustomFieldsModal, setShowCustomFieldsModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [customFields, setCustomFields] = useState<{name: string; type: string}[]>([]);
-  const [inventoryItems, setInventoryItems] = useState([
-    {
-      id: '1',
-      name: 'Notebook Dell Inspiron 15',
-      sku: 'NB-DELL-001',
-      category: 'Eletrônicos',
-      quantity: 15,
-      minStock: 5,
-      price: 2499.99,
-      supplier: 'Dell Brasil',
-      total: 37499.85,
-      location: 'Estoque A-001',
-      status: 'Em estoque',
-      image_url: null
-    },
-    {
-      id: '2',
-      name: 'Mouse Logitech MX Master 3',
-      sku: 'MS-LOG-002',
-      category: 'Periféricos',
-      quantity: 3,
-      minStock: 10,
-      price: 299.99,
-      supplier: 'Logitech',
-      total: 899.97,
-      location: 'Estoque B-025',
-      status: 'Estoque baixo',
-      image_url: null
-    },
-    {
-      id: '3',
-      name: 'Cadeira Ergonômica Premium',
-      sku: 'CD-ERG-003',
-      category: 'Móveis',
-      quantity: 0,
-      minStock: 2,
-      price: 899.99,
-      supplier: 'Móveis Corporativos',
-      total: 0,
-      location: 'Estoque C-010',
-      status: 'Sem estoque',
-      image_url: null
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchInventoryItems();
+  }, []);
+
+  const fetchInventoryItems = async () => {
+    try {
+      setLoading(true);
+      // Buscar itens de inventário do Supabase
+      // Por enquanto, array vazio
+      setInventoryItems([]);
+    } catch (error) {
+      console.error('Erro ao buscar itens de inventário:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
   const navigate = useNavigate();
 
   const getStatusBadge = (status: string, quantity: number, minStock: number) => {

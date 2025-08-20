@@ -42,6 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Limpar dados locais se necessário
+    setUser(null);
+    setSession(null);
   };
 
   const refreshUser = async () => {

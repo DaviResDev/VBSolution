@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, ReactNode } from 'react';
+import { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { Employee } from '@/types/employee';
 
 export interface Activity {
@@ -17,6 +17,7 @@ export interface Activity {
   createdAt: Date;
   completedAt?: string;
   archived?: boolean;
+  leadId?: string; // ID do lead associado à atividade
 }
 
 // Export the Employee type for backwards compatibility
@@ -121,130 +122,29 @@ type VBAction =
   | { type: 'UPDATE_PRODUCT'; payload: Product }
   | { type: 'DELETE_PRODUCT'; payload: string }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<VBSettings> }
-  | { type: 'SET_CURRENT_USER'; payload: CurrentUser };
+  | { type: 'SET_CURRENT_USER'; payload: CurrentUser }
+  | { type: 'LOAD_ACTIVITIES'; payload: Activity[] }
+  | { type: 'LOAD_EMPLOYEES'; payload: Employee[] }
+  | { type: 'LOAD_COMPANIES'; payload: Company[] }
+  | { type: 'LOAD_PRODUCTS'; payload: Product[] }
+  | { type: 'LOAD_SETTINGS'; payload: VBSettings };
 
 const initialState: VBState = {
-  activities: [
-    {
-      id: '1',
-      title: 'Reunião com cliente',
-      description: 'Discussão sobre novos requisitos do projeto',
-      date: new Date('2024-01-15'),
-      priority: 'high',
-      responsibleId: '1',
-      companyId: '1',
-      type: 'meeting',
-      status: 'pending',
-      createdAt: new Date('2024-01-10'),
-      archived: false
-    },
-    {
-      id: '2',
-      title: 'Desenvolver módulo de relatórios',
-      description: 'Implementar sistema de geração de relatórios',
-      date: new Date('2024-01-20'),
-      priority: 'medium',
-      responsibleId: '2',
-      companyId: '1',
-      projectId: '1',
-      type: 'task',
-      status: 'in-progress',
-      createdAt: new Date('2024-01-12'),
-      archived: false
-    }
-  ],
-  employees: [
-    {
-      id: '1',
-      name: 'João Silva',
-      email: 'joao@empresa.com',
-      position: 'Desenvolvedor Frontend',
-      department: 'TI',
-      role: 'employee',
-      phone: '(11) 99999-9999',
-      createdAt: new Date('2024-01-01')
-    },
-    {
-      id: '2',
-      name: 'Maria Santos',
-      email: 'maria@empresa.com',
-      position: 'Gerente de Projetos',
-      department: 'TI',
-      role: 'manager',
-      phone: '(11) 88888-8888',
-      createdAt: new Date('2024-01-01')
-    }
-  ],
-  companies: [
-    {
-      id: '1',
-      corporateName: 'TechCorp LTDA',
-      fantasyName: 'TechCorp',
-      cnpj: '12.345.678/0001-90',
-      email: 'contato@techcorp.com',
-      phone: '(11) 99999-9999',
-      address: {
-        street: 'Rua das Flores, 123',
-        city: 'São Paulo',
-        state: 'SP',
-        zipCode: '01234-567'
-      },
-      companyName: 'TechCorp LTDA',
-      city: 'São Paulo',
-      state: 'SP',
-      cep: '01234-567',
-      description: 'Empresa de tecnologia especializada em soluções digitais',
-      funnelStage: 'stage-1',
-      proposals: [
-        {
-          id: '1',
-          status: 'negotiating',
-          totalValue: 50000,
-          createdAt: new Date('2024-01-15')
-        }
-      ],
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-15')
-    }
-  ],
-  products: [
-    {
-      id: '1',
-      name: 'Sistema CRM',
-      description: 'Sistema de gestão de relacionamento com cliente',
-      price: 5000,
-      category: 'Software',
-      stock: 1,
-      basePrice: 4000,
-      type: 'service'
-    }
-  ],
+  activities: [],
+  employees: [],
+  companies: [],
+  products: [],
   settings: {
     theme: 'light',
     notifications: true,
     language: 'pt-BR',
     companyName: 'VB Solution',
-    primaryColor: '#1a1a1a',
-    secondaryColor: '#f5f5f5',
-    companyLogo: '',
-    departments: ['TI', 'Comercial', 'Financeiro', 'RH', 'Operações'],
-    positions: ['Desenvolvedor', 'Analista', 'Gerente', 'Diretor', 'Estagiário'],
-    funnelStages: [
-      { id: 'stage-1', name: 'Prospecção', order: 1, color: '#3b82f6' },
-      { id: 'stage-2', name: 'Qualificação', order: 2, color: '#8b5cf6' },
-      { id: 'stage-3', name: 'Proposta', order: 3, color: '#f59e0b' },
-      { id: 'stage-4', name: 'Negociação', order: 4, color: '#ef4444' },
-      { id: 'stage-5', name: 'Fechamento', order: 5, color: '#10b981' }
-    ],
+    primaryColor: '#3B82F6',
+    secondaryColor: '#8B5CF6',
+    departments: [],
+    positions: [],
+    funnelStages: [],
     viewMode: 'kanban'
-  },
-  currentUser: {
-    id: '1',
-    name: 'João Silva',
-    email: 'joao@empresa.com',
-    position: 'Desenvolvedor Frontend',
-    department: 'TI',
-    role: 'developer'
   }
 };
 
@@ -320,6 +220,16 @@ function vbReducer(state: VBState, action: VBAction): VBState {
       return { ...state, settings: { ...state.settings, ...action.payload } };
     case 'SET_CURRENT_USER':
       return { ...state, currentUser: action.payload };
+    case 'LOAD_ACTIVITIES':
+      return { ...state, activities: action.payload };
+    case 'LOAD_EMPLOYEES':
+      return { ...state, employees: action.payload };
+    case 'LOAD_COMPANIES':
+      return { ...state, companies: action.payload };
+    case 'LOAD_PRODUCTS':
+      return { ...state, products: action.payload };
+    case 'LOAD_SETTINGS':
+      return { ...state, settings: action.payload };
     default:
       return state;
   }
@@ -334,6 +244,109 @@ const VBContext = createContext<VBContextType | undefined>(undefined);
 
 export const VBProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(vbReducer, initialState);
+
+  // Carregar dados salvos do localStorage na inicialização
+  useEffect(() => {
+    try {
+      const savedActivities = localStorage.getItem('vb-activities');
+      const savedEmployees = localStorage.getItem('vb-employees');
+      const savedCompanies = localStorage.getItem('vb-companies');
+      const savedProducts = localStorage.getItem('vb-products');
+      const savedSettings = localStorage.getItem('vb-settings');
+      const savedCurrentUser = localStorage.getItem('vb-currentUser');
+
+      if (savedActivities) {
+        const activities = JSON.parse(savedActivities).map((activity: any) => ({
+          ...activity,
+          date: new Date(activity.date),
+          createdAt: new Date(activity.createdAt)
+        }));
+        dispatch({ type: 'LOAD_ACTIVITIES', payload: activities });
+      }
+
+      if (savedEmployees) {
+        const employees = JSON.parse(savedEmployees);
+        dispatch({ type: 'LOAD_EMPLOYEES', payload: employees });
+      }
+
+      if (savedCompanies) {
+        const companies = JSON.parse(savedCompanies).map((company: any) => ({
+          ...company,
+          createdAt: new Date(company.createdAt),
+          updatedAt: new Date(company.updatedAt)
+        }));
+        dispatch({ type: 'LOAD_COMPANIES', payload: companies });
+      }
+
+      if (savedProducts) {
+        const products = JSON.parse(savedProducts);
+        dispatch({ type: 'LOAD_PRODUCTS', payload: products });
+      }
+
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        dispatch({ type: 'LOAD_SETTINGS', payload: settings });
+      }
+
+      if (savedCurrentUser) {
+        const currentUser = JSON.parse(savedCurrentUser);
+        dispatch({ type: 'SET_CURRENT_USER', payload: currentUser });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do localStorage:', error);
+    }
+  }, []);
+
+  // Salvar dados no localStorage sempre que o estado mudar
+  useEffect(() => {
+    try {
+      localStorage.setItem('vb-activities', JSON.stringify(state.activities));
+    } catch (error) {
+      console.error('Erro ao salvar atividades no localStorage:', error);
+    }
+  }, [state.activities]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vb-employees', JSON.stringify(state.employees));
+    } catch (error) {
+      console.error('Erro ao salvar funcionários no localStorage:', error);
+    }
+  }, [state.employees]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vb-companies', JSON.stringify(state.companies));
+    } catch (error) {
+      console.error('Erro ao salvar empresas no localStorage:', error);
+    }
+  }, [state.companies]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vb-products', JSON.stringify(state.products));
+    } catch (error) {
+      console.error('Erro ao salvar produtos no localStorage:', error);
+    }
+  }, [state.products]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vb-settings', JSON.stringify(state.settings));
+    } catch (error) {
+      console.error('Erro ao salvar configurações no localStorage:', error);
+    }
+  }, [state.settings]);
+
+  useEffect(() => {
+    if (state.currentUser) {
+      try {
+        localStorage.setItem('vb-currentUser', JSON.stringify(state.currentUser));
+      } catch (error) {
+        console.error('Erro ao salvar usuário atual no localStorage:', error);
+      }
+    }
+  }, [state.currentUser]);
 
   return (
     <VBContext.Provider value={{ state, dispatch }}>

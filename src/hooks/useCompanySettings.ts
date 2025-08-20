@@ -73,7 +73,7 @@ export interface CreateUserData {
   area_id?: string;
 }
 
-export function useCompanySettings() {
+export function useCompanySettings(userId?: string) {
   const emailService = useEmailService();
   const [settings, setSettings] = useState<CompanySettings>({
     company_name: '',
@@ -96,7 +96,7 @@ export function useCompanySettings() {
   const [areas, setAreas] = useState<CompanyArea[]>([]);
   const [roles, setRoles] = useState<CompanyRole[]>([]);
   const [users, setUsers] = useState<CompanyUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Função para hash de senha (simples - em produção usar bcrypt)
@@ -115,53 +115,128 @@ export function useCompanySettings() {
       setLoading(true);
       setError(null);
       
-      // Garantir que todos os campos obrigatórios estejam presentes
-      const settingsToSave = {
-        company_name: newSettings.company_name || '',
-        default_language: newSettings.default_language || 'pt-BR',
-        default_timezone: newSettings.default_timezone || 'America/Sao_Paulo',
-        default_currency: newSettings.default_currency || 'BRL',
-        datetime_format: newSettings.datetime_format || 'DD/MM/YYYY HH:mm',
-        primary_color: newSettings.primary_color || '#021529',
-        secondary_color: newSettings.secondary_color || '#ffffff',
-        accent_color: newSettings.accent_color || '#3b82f6',
-        enable_2fa: newSettings.enable_2fa || false,
-        password_policy: newSettings.password_policy || {
-          min_length: 8,
-          require_numbers: true,
-          require_uppercase: true,
-          require_special: true,
-        },
-        ...newSettings, // Sobrescrever com os valores fornecidos
-        updated_at: new Date().toISOString(),
-      };
+      console.log('Salvando configurações:', newSettings);
 
-      console.log('Salvando configurações:', settingsToSave);
+      // Se não tiver configurações existentes, criar novas
+      if (!settings.id || settings.id.startsWith('mock')) {
+        // Buscar empresa do usuário logado
+        const { data: userProfile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', userId)
+          .single();
 
-      const { data, error } = await supabase
-        .from('company_settings')
-        .upsert(settingsToSave, {
-          onConflict: 'id',
-          ignoreDuplicates: false
-        })
-        .select()
-        .single();
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Erro ao buscar perfil do usuário:', profileError);
+        }
 
-      if (error) {
-        console.error('Erro do Supabase:', error);
-        throw error;
-      }
+        let companyId = userProfile?.company_id;
 
-      if (data) {
-        console.log('Configurações salvas com sucesso:', data);
-        setSettings(prev => ({ 
-          ...prev, 
-          ...data,
-          password_policy: (data.password_policy as CompanySettings['password_policy']) || prev.password_policy,
-        }));
-        return { success: true, data };
+        // Se não tiver company_id no perfil, tentar buscar na tabela company_users
+        if (!companyId) {
+          const { data: companyUser, error: companyUserError } = await supabase
+            .from('company_users')
+            .select('company_id')
+            .eq('user_id', userId)
+            .single();
+
+          if (!companyUserError && companyUser?.company_id) {
+            companyId = companyUser.company_id;
+          }
+        }
+
+        // Se ainda não tiver company_id, criar uma nova empresa
+        if (!companyId) {
+          console.log('Criando nova empresa para o usuário');
+          const { data: newCompany, error: createCompanyError } = await supabase
+            .from('companies')
+            .insert([{
+              fantasy_name: newSettings.company_name || 'Minha Empresa',
+              company_name: newSettings.company_name || 'Minha Empresa',
+              logo_url: newSettings.logo_url,
+              status: 'active'
+            }])
+            .select()
+            .single();
+
+          if (createCompanyError) {
+            throw createCompanyError;
+          }
+
+          companyId = newCompany.id;
+
+          // Atualizar o perfil do usuário com o company_id
+          await supabase
+            .from('user_profiles')
+            .upsert([{
+              id: userId,
+              company_id: companyId,
+              name: 'Usuário',
+              email: 'usuario@empresa.com'
+            }]);
+        }
+
+        // Criar configurações da empresa com estrutura correta
+        const { data: companySettingsData, error: createSettingsError } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_id: companyId,
+            company_name: newSettings.company_name || 'Minha Empresa',
+            logo_url: newSettings.logo_url,
+            default_language: newSettings.default_language || 'pt-BR',
+            default_timezone: newSettings.default_timezone || 'America/Sao_Paulo',
+            default_currency: newSettings.default_currency || 'BRL',
+            datetime_format: newSettings.datetime_format || 'DD/MM/YYYY HH:mm',
+            primary_color: newSettings.primary_color || '#021529',
+            secondary_color: newSettings.secondary_color || '#ffffff',
+            accent_color: newSettings.accent_color || '#3b82f6',
+            enable_2fa: newSettings.enable_2fa || false,
+            password_policy: newSettings.password_policy || {
+              min_length: 8,
+              require_numbers: true,
+              require_uppercase: true,
+              require_special: true,
+            }
+          }])
+          .select()
+          .single();
+
+        if (createSettingsError) {
+          throw createSettingsError;
+        }
+
+        console.log('Configurações da empresa criadas com sucesso:', companySettingsData);
+        setSettings(companySettingsData);
+        return { success: true, data: companySettingsData };
       } else {
-        throw new Error('Nenhum dado retornado ao salvar configurações');
+        // Atualizar configurações existentes
+        const { data: updatedSettingsData, error: updateError } = await supabase
+          .from('company_settings')
+          .update({
+            company_name: newSettings.company_name,
+            logo_url: newSettings.logo_url,
+            default_language: newSettings.default_language,
+            default_timezone: newSettings.default_timezone,
+            default_currency: newSettings.default_currency,
+            datetime_format: newSettings.datetime_format,
+            primary_color: newSettings.primary_color,
+            secondary_color: newSettings.secondary_color,
+            accent_color: newSettings.accent_color,
+            enable_2fa: newSettings.enable_2fa,
+            password_policy: newSettings.password_policy,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settings.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        console.log('Configurações da empresa atualizadas com sucesso:', updatedSettingsData);
+        setSettings(updatedSettingsData);
+        return { success: true, data: updatedSettingsData };
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao salvar configurações';
@@ -171,106 +246,28 @@ export function useCompanySettings() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Carregar configurações da empresa
-  const loadCompanySettings = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('Carregando configurações da empresa...');
-      
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('*')
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Nenhum registro encontrado, criar configurações padrão
-          console.log('Nenhuma configuração encontrada, criando configurações padrão...');
-          const defaultSettings = {
-            company_name: 'Minha Empresa',
-            default_language: 'pt-BR',
-            default_timezone: 'America/Sao_Paulo',
-            default_currency: 'BRL',
-            datetime_format: 'DD/MM/YYYY HH:mm',
-            primary_color: '#021529',
-            secondary_color: '#ffffff',
-            accent_color: '#3b82f6',
-            enable_2fa: false,
-            password_policy: {
-              min_length: 8,
-              require_numbers: true,
-              require_uppercase: true,
-              require_special: true,
-            },
-          };
-          
-          const result = await saveCompanySettings(defaultSettings);
-          if (result.success) {
-            console.log('Configurações padrão criadas com sucesso');
-          } else {
-            console.error('Falha ao criar configurações padrão:', result.error);
-          }
-        } else {
-          console.error('Erro ao carregar configurações:', error);
-          throw error;
-        }
-      } else if (data) {
-        console.log('Configurações carregadas:', data);
-        setSettings(prev => ({
-          ...prev,
-          ...data,
-          password_policy: (data.password_policy as CompanySettings['password_policy']) || prev.password_policy,
-        }));
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar configurações';
-      console.error('Erro ao carregar configurações:', err);
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [saveCompanySettings]);
-
-  // Carregar áreas da empresa
-  const loadAreas = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('company_areas')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
-
-      if (error) throw error;
-      setAreas(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar áreas');
-    }
-  }, []);
+  }, [settings, userId]);
 
   // Adicionar área
   const addArea = useCallback(async (name: string, description?: string) => {
     try {
-      const { data, error } = await supabase
-        .from('company_areas')
-        .insert({
-          name,
-          description,
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Adicionando área (mock):', { name, description });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const newArea: CompanyArea = {
+        id: `area-${Date.now()}`,
+        name,
+        description,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
       
       // Atualizar estado local
-      setAreas(prev => [...prev, data]);
-      return { success: true, data };
+      setAreas(prev => [...prev, newArea]);
+      return { success: true, data: newArea };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao adicionar área');
       return { success: false, error: err };
@@ -280,36 +277,33 @@ export function useCompanySettings() {
   // Editar área
   const editArea = useCallback(async (id: string, updates: Partial<CompanyArea>) => {
     try {
-      const { data, error } = await supabase
-        .from('company_areas')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Editando área (mock):', { id, updates });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
-      setAreas(prev => prev.map(area => area.id === id ? data : area));
-      return { success: true, data };
+      setAreas(prev => prev.map(area => 
+        area.id === id 
+          ? { ...area, ...updates, updated_at: new Date().toISOString() }
+          : area
+      ));
+      
+      const updatedArea = areas.find(area => area.id === id);
+      return { success: true, data: updatedArea };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao editar área');
       return { success: false, error: err };
     }
-  }, []);
+  }, [areas]);
 
   // Excluir área
   const deleteArea = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('company_areas')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      console.log('Excluindo área (mock):', id);
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
       setAreas(prev => prev.filter(area => area.id !== id));
@@ -320,49 +314,22 @@ export function useCompanySettings() {
     }
   }, []);
 
-  // Carregar cargos
-  const loadRoles = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('company_roles')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
-
-      if (error) throw error;
-      
-      const rolesWithPermissions = (data || []).map(role => ({
-        ...role,
-        permissions: (role.permissions as Record<string, boolean>) || {},
-      }));
-      
-      setRoles(rolesWithPermissions);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar cargos');
-    }
-  }, []);
-
   // Adicionar cargo
   const addRole = useCallback(async (name: string, description?: string) => {
     try {
-      const { data, error } = await supabase
-        .from('company_roles')
-        .insert({
-          name,
-          description,
-          status: 'active',
-          permissions: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Adicionando cargo (mock):', { name, description });
       
-      const newRole = {
-        ...data,
-        permissions: (data.permissions as Record<string, boolean>) || {},
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const newRole: CompanyRole = {
+        id: `role-${Date.now()}`,
+        name,
+        description,
+        status: 'active',
+        permissions: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       
       // Atualizar estado local
@@ -377,21 +344,15 @@ export function useCompanySettings() {
   // Editar cargo
   const editRole = useCallback(async (id: string, updates: Partial<CompanyRole>) => {
     try {
-      const { data, error } = await supabase
-        .from('company_roles')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Editando cargo (mock):', { id, updates });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       const updatedRole = {
-        ...data,
-        permissions: (data.permissions as Record<string, boolean>) || {},
+        ...roles.find(role => role.id === id)!,
+        ...updates,
+        updated_at: new Date().toISOString(),
       };
       
       // Atualizar estado local
@@ -401,17 +362,15 @@ export function useCompanySettings() {
       setError(err instanceof Error ? err.message : 'Erro ao editar cargo');
       return { success: false, error: err };
     }
-  }, []);
+  }, [roles]);
 
   // Excluir cargo
   const deleteRole = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('company_roles')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      console.log('Excluindo cargo (mock):', id);
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
       setRoles(prev => prev.filter(role => role.id !== id));
@@ -425,16 +384,11 @@ export function useCompanySettings() {
   // Salvar permissões do cargo
   const saveRolePermissions = useCallback(async (roleId: string, permissions: Record<string, boolean>) => {
     try {
-      const { error } = await supabase
-        .from('company_roles')
-        .update({ 
-          permissions,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', roleId);
-
-      if (error) throw error;
-
+      console.log('Salvando permissões do cargo (mock):', { roleId, permissions });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Atualizar estado local
       setRoles(prev => prev.map(role => 
         role.id === roleId ? { ...role, permissions } : role
@@ -447,109 +401,64 @@ export function useCompanySettings() {
     }
   }, []);
 
-  // Carregar usuários
-  const loadUsers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('company_users')
-        .select(`
-          *,
-          company_roles(name),
-          company_areas(name)
-        `)
-        .order('full_name');
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar usuários');
-    }
-  }, []);
-
   // Adicionar usuário
   const addUser = useCallback(async (userData: CreateUserData) => {
     try {
-      // Gerar token de convite
-      const inviteToken = emailService.generateInviteToken();
+      console.log('Adicionando usuário (mock):', userData);
       
-      // Criar usuário com status pendente
-      const { data, error } = await supabase
-        .from('company_users')
-        .insert({
-          ...userData,
-          password_hash: hashPassword(userData.password),
-          status: 'pending',
-          invite_token: inviteToken,
-          invite_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 horas
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Enviar e-mail de convite
-      const roleName = roles.find(r => r.id === userData.role_id)?.name;
-      const areaName = areas.find(a => a.id === userData.area_id)?.name;
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const inviteUrl = emailService.generateInviteUrl(userData.email, inviteToken);
+      const newUser: CompanyUser = {
+        id: `user-${Date.now()}`,
+        ...userData,
+        password_hash: 'mock-hash',
+        status: 'pending',
+        invite_token: 'mock-token',
+        invite_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
       
-      const emailResult = await emailService.sendInviteEmail({
-        email: userData.email,
-        fullName: userData.full_name,
-        companyName: settings.company_name || 'Nossa Empresa',
-        inviteUrl,
-        roleName,
-        areaName,
-      });
-
-      if (!emailResult.success) {
-        console.warn('Usuário criado mas falha ao enviar e-mail:', emailResult.error);
-      }
-
       // Atualizar estado local
-      setUsers(prev => [...prev, data]);
-      return { success: true, data };
+      setUsers(prev => [...prev, newUser]);
+      return { success: true, data: newUser };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao adicionar usuário');
       return { success: false, error: err };
     }
-  }, [emailService, roles, areas, settings.company_name]);
+  }, []);
 
   // Editar usuário
   const editUser = useCallback(async (id: string, updates: Partial<CompanyUser>) => {
     try {
-      const { data, error } = await supabase
-        .from('company_users')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Editando usuário (mock):', { id, updates });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
-      setUsers(prev => prev.map(user => user.id === id ? data : user));
-      return { success: true, data };
+      setUsers(prev => prev.map(user => 
+        user.id === id 
+          ? { ...user, ...updates, updated_at: new Date().toISOString() }
+          : user
+      ));
+      
+      const updatedUser = users.find(user => user.id === id);
+      return { success: true, data: updatedUser };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao editar usuário');
       return { success: false, error: err };
     }
-  }, []);
+  }, [users]);
 
   // Excluir usuário
   const deleteUser = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('company_users')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      console.log('Excluindo usuário (mock):', id);
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
       setUsers(prev => prev.filter(user => user.id !== id));
@@ -563,54 +472,57 @@ export function useCompanySettings() {
   // Alterar status do usuário
   const updateUserStatus = useCallback(async (id: string, status: string) => {
     try {
-      const { data, error } = await supabase
-        .from('company_users')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Alterando status do usuário (mock):', { id, status });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
-      setUsers(prev => prev.map(user => user.id === id ? data : user));
-      return { success: true, data };
+      setUsers(prev => prev.map(user => 
+        user.id === id 
+          ? { ...user, status, updated_at: new Date().toISOString() }
+          : user
+      ));
+      
+      const updatedUser = users.find(user => user.id === id);
+      return { success: true, data: updatedUser };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao alterar status do usuário');
       return { success: false, error: err };
     }
-  }, []);
+  }, [users]);
 
   // Redefinir senha do usuário
   const resetUserPassword = useCallback(async (id: string, newPassword: string) => {
     try {
-      const { data, error } = await supabase
-        .from('company_users')
-        .update({ 
-          password_hash: hashPassword(newPassword),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('Redefinindo senha do usuário (mock):', { id, newPassword: '***' });
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Atualizar estado local
-      setUsers(prev => prev.map(user => user.id === id ? data : user));
-      return { success: true, data };
+      setUsers(prev => prev.map(user => 
+        user.id === id 
+          ? { ...user, password_hash: 'new-mock-hash', updated_at: new Date().toISOString() }
+          : user
+      ));
+      
+      const updatedUser = users.find(user => user.id === id);
+      return { success: true, data: updatedUser };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao redefinir senha');
       return { success: false, error: err };
     }
-  }, []);
+  }, [users]);
 
   // Atualizar logo da empresa
   const updateLogo = useCallback(async (logoUrl: string) => {
     try {
+      console.log('Atualizando logo (mock):', logoUrl);
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const result = await saveCompanySettings({ logo_url: logoUrl });
       return result;
     } catch (err) {
@@ -622,6 +534,11 @@ export function useCompanySettings() {
   // Remover logo da empresa
   const removeLogo = useCallback(async () => {
     try {
+      console.log('Removendo logo (mock)');
+      
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const result = await saveCompanySettings({ logo_url: null });
       return result;
     } catch (err) {
@@ -630,19 +547,341 @@ export function useCompanySettings() {
     }
   }, [saveCompanySettings]);
 
+  // Função para buscar configurações da empresa do usuário logado
+  const fetchCompanySettings = useCallback(async (userIdParam?: string) => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+      // Usar o userId passado como parâmetro ou o do hook
+      const targetUserId = userIdParam || userId;
+      
+      // Se não tiver userId, não pode buscar configurações
+      if (!targetUserId) {
+        console.log('Usuário não fornecido, usando dados mock');
+        const mockSettings: CompanySettings = {
+          id: 'mock-no-user',
+          company_name: 'CRM Sistema',
+          default_language: 'pt-BR',
+          default_timezone: 'America/Sao_Paulo',
+          default_currency: 'BRL',
+          datetime_format: 'DD/MM/YYYY HH:mm',
+          primary_color: '#021529',
+          secondary_color: '#ffffff',
+          accent_color: '#3b82f6',
+          enable_2fa: false,
+          password_policy: {
+            min_length: 8,
+            require_numbers: true,
+            require_uppercase: true,
+            require_special: true,
+          },
+        };
+        setSettings(mockSettings);
+        return;
+      }
+      
+      // Primeiro, buscar o perfil do usuário para obter o company_id
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', targetUserId)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Erro ao buscar perfil do usuário:', profileError);
+      }
+
+      let companyId = userProfile?.company_id;
+
+      // Se não tiver company_id no perfil, tentar buscar na tabela company_users
+      if (!companyId) {
+        const { data: companyUser, error: companyUserError } = await supabase
+          .from('company_users')
+          .select('company_id')
+          .eq('user_id', targetUserId)
+          .single();
+
+        if (!companyUserError && companyUser?.company_id) {
+          companyId = companyUser.company_id;
+        }
+      }
+
+      // Se ainda não tiver company_id, usar o primeiro registro disponível
+      if (!companyId) {
+        console.log('Usuário não tem empresa associada, buscando primeira empresa disponível');
+        const { data: firstCompany, error: firstCompanyError } = await supabase
+          .from('companies')
+          .select('id')
+          .limit(1)
+          .single();
+
+        if (!firstCompanyError && firstCompany?.id) {
+          companyId = firstCompany.id;
+        }
+      }
+
+      // Buscar configurações da empresa específica
+      if (companyId) {
+        const { data: companySettingsData, error: companySettingsError } = await supabase
+          .from('company_settings')
+          .select('*')
+          .eq('company_id', companyId)
+          .single();
+
+        if (companySettingsError && companySettingsError.code !== 'PGRST116') {
+          console.error('Erro ao buscar configurações da empresa:', companySettingsError);
+        }
+
+        if (companySettingsData) {
+          setSettings(companySettingsData);
+          console.log('Configurações da empresa carregadas:', companySettingsData);
+        } else {
+          // Se não encontrar configurações específicas, buscar dados da empresa
+          const { data: companyData, error: companyError } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('id', companyId)
+            .single();
+
+          if (!companyError && companyData) {
+            // Criar configurações baseadas nos dados da empresa
+            const companySettings: CompanySettings = {
+              id: `company-${companyId}`,
+              company_name: companyData.fantasy_name || companyData.company_name || 'Minha Empresa',
+              logo_url: companyData.logo_url,
+              default_language: 'pt-BR',
+              default_timezone: 'America/Sao_Paulo',
+              default_currency: 'BRL',
+              datetime_format: 'DD/MM/YYYY HH:mm',
+              primary_color: '#021529',
+              secondary_color: '#ffffff',
+              accent_color: '#3b82f6',
+              enable_2fa: false,
+              password_policy: {
+                min_length: 8,
+                require_numbers: true,
+                require_uppercase: true,
+                require_special: true,
+              },
+            };
+            setSettings(companySettings);
+            console.log('Configurações criadas a partir dos dados da empresa:', companySettings);
+          } else {
+        console.log('Usando dados mock para configurações');
+            // Configurações mock
+            const mockSettings: CompanySettings = {
+              id: 'mock-1',
+              company_name: 'Minha Empresa',
+              default_language: 'pt-BR',
+              default_timezone: 'America/Sao_Paulo',
+              default_currency: 'BRL',
+              datetime_format: 'DD/MM/YYYY HH:mm',
+              primary_color: '#021529',
+              secondary_color: '#ffffff',
+              accent_color: '#3b82f6',
+              enable_2fa: false,
+              password_policy: {
+                min_length: 8,
+                require_numbers: true,
+                require_uppercase: true,
+                require_special: true,
+              },
+            };
+            setSettings(mockSettings);
+          }
+        }
+      } else {
+        console.log('Usando dados mock para configurações (sem empresa)');
+        // Configurações mock
+        const mockSettings: CompanySettings = {
+          id: 'mock-1',
+          company_name: 'Minha Empresa',
+          default_language: 'pt-BR',
+          default_timezone: 'America/Sao_Paulo',
+          default_currency: 'BRL',
+          datetime_format: 'DD/MM/YYYY HH:mm',
+          primary_color: '#021529',
+          secondary_color: '#ffffff',
+          accent_color: '#3b82f6',
+          enable_2fa: false,
+          password_policy: {
+            min_length: 8,
+            require_numbers: true,
+            require_uppercase: true,
+            require_special: true,
+          },
+        };
+        setSettings(mockSettings);
+      }
+
+      // Buscar áreas da empresa
+      const { data: areasData, error: areasError } = await supabase
+        .from('company_areas')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('name');
+
+      if (areasError && areasError.code !== 'PGRST116') {
+        throw areasError;
+      }
+
+      if (areasData && areasData.length > 0) {
+        setAreas(areasData);
+        console.log('Áreas da empresa carregadas:', areasData);
+      } else {
+        console.log('Usando dados mock para áreas');
+        // Áreas mock
+        const mockAreas: CompanyArea[] = [
+          {
+            id: 'area-1',
+            name: 'Administração',
+            description: 'Setor administrativo da empresa',
+            status: 'active',
+            company_id: companyId,
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          },
+          {
+            id: 'area-2',
+            name: 'Vendas',
+            description: 'Setor de vendas e comercial',
+            status: 'active',
+            company_id: companyId,
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          },
+          {
+            id: 'area-3',
+            name: 'TI',
+            description: 'Tecnologia da Informação',
+            status: 'active',
+            company_id: companyId,
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          }
+        ];
+        setAreas(mockAreas);
+      }
+
+      // Buscar cargos da empresa
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('company_roles')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('name');
+
+      if (rolesError && rolesError.code !== 'PGRST116') {
+        throw rolesError;
+      }
+
+      if (rolesData && rolesData.length > 0) {
+        setRoles(rolesData);
+        console.log('Cargos da empresa carregados:', rolesData);
+      } else {
+        console.log('Usando dados mock para cargos');
+        // Cargos mock
+        const mockRoles: CompanyRole[] = [
+          {
+            id: 'role-1',
+            name: 'Administrador',
+            description: 'Administrador do sistema',
+            status: 'active',
+            company_id: companyId,
+            permissions: {},
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          },
+          {
+            id: 'role-2',
+            name: 'Gerente',
+            description: 'Gerente de equipe',
+            status: 'active',
+            company_id: companyId,
+            permissions: {},
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          },
+          {
+            id: 'role-3',
+            name: 'Usuário',
+            description: 'Usuário padrão',
+            status: 'active',
+            company_id: companyId,
+            permissions: {},
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          }
+        ];
+        setRoles(mockRoles);
+      }
+
+      // Buscar usuários da empresa
+      const { data: usersData, error: usersError } = await supabase
+        .from('company_users')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('full_name');
+
+      if (usersError && usersError.code !== 'PGRST116') {
+        throw usersError;
+      }
+
+      if (usersData && usersData.length > 0) {
+        setUsers(usersData);
+        console.log('Usuários da empresa carregados:', usersData);
+      } else {
+        console.log('Usando dados mock para usuários');
+        // Usuários mock
+        const mockUsers: CompanyUser[] = [
+          {
+            id: 'user-1',
+            full_name: 'Usuário Administrador',
+            email: 'admin@empresa.com',
+            password_hash: 'mock-hash',
+            status: 'active',
+            company_id: companyId,
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
+          }
+        ];
+        setUsers(mockUsers);
+      }
+        
+      } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar configurações';
+      console.error('Erro ao carregar configurações da empresa:', err);
+        setError(errorMessage);
+      
+      // Em caso de erro, usar configurações mock
+      const mockSettings: CompanySettings = {
+        id: 'mock-error',
+        company_name: 'CRM Sistema',
+        default_language: 'pt-BR',
+        default_timezone: 'America/Sao_Paulo',
+        default_currency: 'BRL',
+        datetime_format: 'DD/MM/YYYY HH:mm',
+        primary_color: '#021529',
+        secondary_color: '#ffffff',
+        accent_color: '#3b82f6',
+        enable_2fa: false,
+        password_policy: {
+          min_length: 8,
+          require_numbers: true,
+          require_uppercase: true,
+          require_special: true,
+        },
+      };
+      setSettings(mockSettings);
+      } finally {
+        setLoading(false);
+      }
+  }, [userId]);
+
   // Carregar dados iniciais
   useEffect(() => {
-    const loadInitialData = async () => {
-      await Promise.all([
-        loadCompanySettings(),
-        loadAreas(),
-        loadRoles(),
-        loadUsers(),
-      ]);
-    };
-
-    loadInitialData();
-  }, [loadCompanySettings, loadAreas, loadRoles, loadUsers]);
+    fetchCompanySettings();
+  }, [fetchCompanySettings]);
 
   return {
     settings,
@@ -667,9 +906,6 @@ export function useCompanySettings() {
     updateLogo,
     removeLogo,
     verifyPassword,
-    loadCompanySettings,
-    loadAreas,
-    loadRoles,
-    loadUsers,
+    fetchCompanySettings, // Exportar a função para uso externo
   };
 }

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,39 +55,26 @@ const SalesOrders = () => {
     toast.success('Status atualizado com sucesso!');
   };
 
-  // Mock data for demonstration
-  const orders = [
-    {
-      id: 'PV-001',
-      customer: 'João Silva',
-      status: 'pending' as const,
-      priority: 'high' as const,
-      total: 2500.00,
-      date: '2024-01-15',
-      responsible: 'Ana Costa',
-      description: 'Pedido de produtos eletrônicos para empresa TechCorp'
-    },
-    {
-      id: 'PV-002',
-      customer: 'Maria Santos',
-      status: 'confirmed' as const,
-      priority: 'medium' as const,
-      total: 1800.00,
-      date: '2024-01-14',
-      responsible: 'Carlos Lima',
-      description: 'Pedido de materiais de escritório para empresa OfficePlus'
-    },
-    {
-      id: 'PV-003',
-      customer: 'Pedro Oliveira',
-      status: 'shipped' as const,
-      priority: 'low' as const,
-      total: 3200.00,
-      date: '2024-01-13',
-      responsible: 'Ana Costa',
-      description: 'Pedido de equipamentos de segurança'
+  // Dados carregados do Supabase
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      // Buscar pedidos de vendas do Supabase
+      // Por enquanto, array vazio
+      setOrders([]);
+    } catch (error) {
+      console.error('Erro ao buscar pedidos:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = !searchTerm || 

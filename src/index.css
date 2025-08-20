@@ -59,7 +59,7 @@
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --input: 75 85% 15%;
     --ring: 210 100% 8%;
 
     --radius: 0.5rem;
@@ -116,7 +116,7 @@
     --destructive-foreground: 210 40% 98%;
 
     --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --input: 75 85% 15%;
     --ring: 210 100% 8%;
 
     /* Dark mode sidebar colors */

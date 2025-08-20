@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,70 +32,24 @@ const LeadsSales = () => {
   const { stages, loading: stagesLoading } = useFunnelStages();
   const { products, loading: productsLoading } = useProducts();
 
-  // Mock pipelines data - replace with actual data from your backend
-  const pipelines = [
-    { id: 'default', name: 'Pipeline Principal', description: 'Pipeline padrão de vendas' },
-    { id: 'enterprise', name: 'Empresas', description: 'Pipeline para grandes empresas' },
-    { id: 'retail', name: 'Varejo', description: 'Pipeline para varejo' }
-  ];
+  // Dados carregados do Supabase
+  const [pipelines, setPipelines] = useState([]);
+  const [funnelStages, setFunnelStages] = useState([]);
 
-  const funnelStages = [
-    {
-      id: 'leads',
-      title: 'Leads',
-      count: 24,
-      value: 'R$ 120.000',
-      color: 'bg-gray-600',
-      deals: [
-        { id: '1', title: 'Empresa ABC', value: 'R$ 15.000', contact: 'João Silva', company: 'ABC Corp', date: '2024-01-15' },
-        { id: '2', title: 'Tech Solutions', value: 'R$ 25.000', contact: 'Maria Santos', company: 'Tech Inc', date: '2024-01-16' },
-        { id: '3', title: 'Inovação Digital', value: 'R$ 8.500', contact: 'Pedro Lima', company: 'Digital Co', date: '2024-01-17' }
-      ]
-    },
-    {
-      id: 'qualified',
-      title: 'Qualificados',
-      count: 18,
-      value: 'R$ 85.000',
-      color: 'bg-gray-600',
-      deals: [
-        { id: '4', title: 'Startup XYZ', value: 'R$ 12.000', contact: 'Ana Costa', company: 'XYZ Ltd', date: '2024-01-18' },
-        { id: '5', title: 'Consultoria Prime', value: 'R$ 18.000', contact: 'Carlos Oliveira', company: 'Prime Co', date: '2024-01-19' }
-      ]
-    },
-    {
-      id: 'proposal',
-      title: 'Proposta',
-      count: 12,
-      value: 'R$ 65.000',
-      color: 'bg-gray-600',
-      deals: [
-        { id: '6', title: 'Global Corp', value: 'R$ 30.000', contact: 'Lucia Ferreira', company: 'Global Inc', date: '2024-01-20' },
-        { id: '7', title: 'Future Tech', value: 'R$ 22.000', contact: 'Roberto Alves', company: 'Future Co', date: '2024-01-21' }
-      ]
-    },
-    {
-      id: 'negotiation',
-      title: 'Negociação',
-      count: 8,
-      value: 'R$ 45.000',
-      color: 'bg-gray-600',
-      deals: [
-        { id: '8', title: 'MegaCorp Ltd', value: 'R$ 35.000', contact: 'Fernanda Rocha', company: 'Mega Corp', date: '2024-01-22' }
-      ]
-    },
-    {
-      id: 'closed',
-      title: 'Fechado',
-      count: 15,
-      value: 'R$ 125.000',
-      color: 'bg-gray-600',
-      deals: [
-        { id: '9', title: 'Success Co.', value: 'R$ 28.000', contact: 'Ricardo Mendes', company: 'Success Inc', date: '2024-01-23' },
-        { id: '10', title: 'Winner Inc', value: 'R$ 45.000', contact: 'Julia Torres', company: 'Winner Co', date: '2024-01-24' }
-      ]
+  useEffect(() => {
+    fetchFunnelData();
+  }, []);
+
+  const fetchFunnelData = async () => {
+    try {
+      // Buscar dados do funil de vendas do Supabase
+      // Por enquanto, arrays vazios
+      setPipelines([]);
+      setFunnelStages([]);
+    } catch (error) {
+      console.error('Erro ao buscar dados do funil:', error);
     }
-  ];
+  };
 
   // Filtrar leads
   const filteredLeads = leads.filter(lead => {

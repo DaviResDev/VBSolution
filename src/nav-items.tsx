@@ -122,19 +122,9 @@ export const navItems: NavItem[] = [
     icon: FolderOpen,
   },
   {
-    title: "Documentos",
-    to: "/documents",
-    icon: FileText,
-  },
-  {
     title: "Relatórios",
     to: "/reports",
     icon: BarChart3,
-  },
-  {
-    title: "WhatsApp",
-    to: "/whatsapp",
-    icon: MessageCircle,
   },
   {
     title: "Chat",
@@ -145,6 +135,11 @@ export const navItems: NavItem[] = [
     title: "Colaborações",
     to: "/collaborations",
     icon: Users,
+  },
+  {
+    title: "WhatsApp",
+    to: "/whatsapp",
+    icon: MessageCircle,
   },
   {
     title: "Configurações",

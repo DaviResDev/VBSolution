@@ -16,57 +16,29 @@ const ReportsDashboard = () => {
   const [reportType, setReportType] = useState('sales');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock data for demonstration
-  const salesData = [
-    { name: 'Jan', vendas: 4000, leads: 2400, conversao: 15 },
-    { name: 'Fev', vendas: 3000, leads: 1398, conversao: 18 },
-    { name: 'Mar', vendas: 2000, leads: 9800, conversao: 12 },
-    { name: 'Abr', vendas: 2780, leads: 3908, conversao: 22 },
-    { name: 'Mai', vendas: 1890, leads: 4800, conversao: 19 },
-    { name: 'Jun', vendas: 2390, leads: 3800, conversao: 25 }
-  ];
+  // Dados carregados do Supabase
+  const [salesData, setSalesData] = useState([]);
+  const [pieData, setPieData] = useState([]);
+  const [kpiCards, setKpiCards] = useState([]);
 
-  const pieData = [
-    { name: 'Novos Clientes', value: 400, color: '#0088FE' },
-    { name: 'Clientes Recorrentes', value: 300, color: '#00C49F' },
-    { name: 'Reativados', value: 200, color: '#FFBB28' },
-    { name: 'Perdidos', value: 100, color: '#FF8042' }
-  ];
+  useEffect(() => {
+    fetchReportData();
+  }, [dateRange, reportType]);
 
-  const kpiCards = [
-    {
-      title: 'Receita Total',
-      value: 'R$ 247.350',
-      change: '+15%',
-      changeType: 'increase',
-      icon: DollarSign,
-      description: 'vs mês anterior'
-    },
-    {
-      title: 'Novos Leads',
-      value: '1.247',
-      change: '+22%',
-      changeType: 'increase',
-      icon: Users,
-      description: 'este mês'
-    },
-    {
-      title: 'Taxa de Conversão',
-      value: '18.5%',
-      change: '-3%',
-      changeType: 'decrease',
-      icon: Target,
-      description: 'leads para vendas'
-    },
-    {
-      title: 'Ticket Médio',
-      value: 'R$ 1.890',
-      change: '0%',
-      changeType: 'neutral',
-      icon: BarChart3,
-      description: 'por venda'
+  const fetchReportData = async () => {
+    try {
+      setIsLoading(true);
+      // Buscar dados de relatórios do Supabase
+      // Por enquanto, arrays vazios
+      setSalesData([]);
+      setPieData([]);
+      setKpiCards([]);
+    } catch (error) {
+      console.error('Erro ao buscar dados de relatórios:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const getChangeIcon = (type: string) => {
     switch (type) {

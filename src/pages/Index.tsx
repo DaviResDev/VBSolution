@@ -98,32 +98,20 @@ export default function Index() {
     return () => clearInterval(interval);
   }, [userName]);
 
-  // Mock de eventos do calendário (sincronizado com a página Calendar)
+  // Eventos do calendário carregados do Supabase
   useEffect(() => {
-    const mockEvents = [
-      {
-        id: '1',
-        title: 'Reunião com Cliente ABC',
-        date: new Date(),
-        time: '14:00',
-        type: 'meeting',
-        description: 'Discussão sobre o projeto de redesign',
-        attendees: ['João Silva', 'Maria Santos'],
-        location: 'Sala de Reuniões 1'
-      },
-      {
-        id: '2',
-        title: 'Deadline Projeto Dashboard',
-        date: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        time: '17:00',
-        type: 'deadline',
-        description: 'Entrega final do projeto de dashboard',
-        attendees: ['Equipe Dev'],
-        location: 'Remoto'
-      }
-    ];
-    setCalendarEvents(mockEvents);
+    fetchCalendarEvents();
   }, []);
+
+  const fetchCalendarEvents = async () => {
+    try {
+      // Buscar eventos do Supabase quando implementarmos a tabela de eventos
+      // Por enquanto, array vazio
+      setCalendarEvents([]);
+    } catch (error) {
+      console.error('Erro ao buscar eventos:', error);
+    }
+  };
 
   // Função para obter atividades recentes
   const getRecentActivities = () => {

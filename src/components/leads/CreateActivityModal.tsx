@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { LeadWithDetails } from '@/hooks/useLeads';
 import { createSafeSelectItems } from '@/utils/selectValidation';
+import { useVB } from '@/contexts/VBContext';
 
 interface CreateActivityModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface CreateActivityModalProps {
 }
 
 const CreateActivityModal = ({ isOpen, onClose, leads }: CreateActivityModalProps) => {
+  const { dispatch } = useVB();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -43,8 +45,22 @@ const CreateActivityModal = ({ isOpen, onClose, leads }: CreateActivityModalProp
     setLoading(true);
 
     try {
-      // Aqui você implementaria a criação da atividade
-      console.log('Creating activity:', formData);
+      // Criar nova atividade usando o contexto VBContext
+      const newActivity = {
+        id: Date.now().toString(),
+        title: formData.title,
+        description: formData.description,
+        date: new Date(`${formData.scheduledDate}T${formData.scheduledTime || '00:00'}`),
+        priority: 'medium' as const,
+        responsibleId: '', // Será definido pelo usuário logado ou selecionado
+        type: (formData.type === 'email' ? 'other' : formData.type) as 'call' | 'meeting' | 'task' | 'other',
+        status: 'pending' as const,
+        createdAt: new Date(),
+        leadId: formData.leadId
+      };
+
+      // Adicionar ao contexto (que automaticamente salva no localStorage)
+      dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
       
       toast({
         title: "Atividade criada",

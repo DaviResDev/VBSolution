@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useVB } from '@/contexts/VBContext';
+import { useActivities } from '@/hooks/useActivities';
 import { ArrowLeft, Calendar, User, Building2, Clock, Edit, Save, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ActivityForm from '@/components/ActivityForm';
@@ -13,8 +14,17 @@ const ActivityDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { state, dispatch } = useVB();
-  const { activities, companies, employees } = state;
+  const { companies, employees } = state;
+  const { activities, loading, error, updateActivity } = useActivities();
   const [isEditing, setIsEditing] = useState(false);
+
+  // Debug logs
+  useEffect(() => {
+    console.log('🔍 ActivityDetail - ID recebido:', id);
+    console.log('🔍 ActivityDetail - Atividades carregadas:', activities);
+    console.log('🔍 ActivityDetail - Loading:', loading);
+    console.log('🔍 ActivityDetail - Error:', error);
+  }, [id, activities, loading, error]);
 
   const activity = activities.find(a => a.id === id);
   const isNewActivity = id === 'new';
@@ -25,12 +35,47 @@ const ActivityDetail = () => {
     }
   }, [isNewActivity]);
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/50 p-6 shadow-sm text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando atividade...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/50 p-6 shadow-sm text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Erro ao carregar atividade</h1>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={() => navigate('/activities')} className="bg-blue-600 hover:bg-blue-700">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar para Atividades
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!activity && !isNewActivity) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/50 p-6 shadow-sm text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Atividade não encontrada</h1>
+            <p className="text-gray-600 mb-4">A atividade que você está procurando não existe ou foi removida.</p>
+            <p className="text-gray-500 mb-4">ID procurado: {id}</p>
+            <p className="text-gray-500 mb-4">Total de atividades carregadas: {activities.length}</p>
             <Button onClick={() => navigate('/activities')} className="bg-blue-600 hover:bg-blue-700">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar para Atividades
@@ -55,10 +100,9 @@ const ActivityDetail = () => {
   const getStatusColor = (status: string) => {
     const statusColors = {
       'completed': 'bg-green-100 text-green-700 border-green-200',
-      'in-progress': 'bg-blue-100 text-blue-700 border-blue-200',
+      'in_progress': 'bg-blue-100 text-blue-700 border-blue-200',
       'pending': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      'backlog': 'bg-gray-100 text-gray-700 border-gray-200',
-      'overdue': 'bg-red-100 text-red-700 border-red-200'
+      'cancelled': 'bg-gray-100 text-gray-700 border-gray-200'
     };
     return statusColors[status as keyof typeof statusColors] || statusColors.pending;
   };
@@ -66,16 +110,16 @@ const ActivityDetail = () => {
   const getStatusText = (status: string) => {
     const statusTexts = {
       'completed': 'Concluída',
-      'in-progress': 'Em Andamento',
+      'in_progress': 'Em Andamento',
       'pending': 'Pendente',
-      'backlog': 'Backlog',
-      'overdue': 'Atrasada'
+      'cancelled': 'Cancelada'
     };
     return statusTexts[status as keyof typeof statusTexts] || 'Pendente';
   };
 
   const getPriorityColor = (priority: string) => {
     const priorityColors = {
+      'urgent': 'bg-red-100 text-red-700 border-red-200',
       'high': 'bg-red-100 text-red-700 border-red-200',
       'medium': 'bg-yellow-100 text-yellow-700 border-yellow-200',
       'low': 'bg-green-100 text-green-700 border-green-200'
@@ -85,6 +129,7 @@ const ActivityDetail = () => {
 
   const getPriorityText = (priority: string) => {
     const priorityTexts = {
+      'urgent': 'Urgente',
       'high': 'Alta',
       'medium': 'Média',
       'low': 'Baixa'
@@ -92,30 +137,28 @@ const ActivityDetail = () => {
     return priorityTexts[priority as keyof typeof priorityTexts] || 'Média';
   };
 
-  const handleSave = (formData: any) => {
+  const handleSave = async (formData: any) => {
     if (isNewActivity) {
-      const newActivity = {
-        id: Date.now().toString(),
-        ...formData,
-        status: 'backlog' as const,
-        createdAt: new Date()
-      };
-      dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
-      toast({
-        title: "Sucesso",
-        description: "Atividade criada com sucesso!",
-      });
+      // Para novas atividades, redirecionar para a página de criação
       navigate('/activities');
+      return;
     } else {
-      dispatch({
-        type: 'UPDATE_ACTIVITY',
-        payload: { ...activity, ...formData }
-      });
-      toast({
-        title: "Sucesso",
-        description: "Atividade atualizada com sucesso!",
-      });
-      setIsEditing(false);
+      try {
+        const result = await updateActivity(activity.id, formData);
+        if (result) {
+          toast({
+            title: "Sucesso",
+            description: "Atividade atualizada com sucesso!",
+          });
+          setIsEditing(false);
+        }
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar atividade",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -205,36 +248,47 @@ const ActivityDetail = () => {
                   )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Data</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-900">
-                          {activity?.date.toLocaleDateString('pt-BR')}
-                        </span>
+                    {activity?.due_date && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Data de Vencimento</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <span className="text-gray-900">
+                            {new Date(activity.due_date).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Responsável</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-900">
-                          {getEmployeeName(activity?.responsibleId || '')}
-                        </span>
+                    {activity?.responsible_id && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Responsável</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <span className="text-gray-900">
+                            {getEmployeeName(activity.responsible_id)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   
-                  {activity?.companyId && (
+                  {activity?.company_id && (
                     <div>
                       <label className="text-sm font-medium text-gray-600">Empresa</label>
                       <div className="flex items-center gap-2 mt-1">
                         <Building2 className="h-4 w-4 text-gray-400" />
                         <span className="text-gray-900">
-                          {getCompanyName(activity.companyId)}
+                          {getCompanyName(activity.company_id)}
                         </span>
                       </div>
+                    </div>
+                  )}
+
+                  {activity?.type && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Tipo</label>
+                      <p className="text-gray-900 capitalize">{activity.type}</p>
                     </div>
                   )}
                 </CardContent>
@@ -269,10 +323,22 @@ const ActivityDetail = () => {
                     <div className="flex items-center gap-2 mt-1">
                       <Clock className="h-4 w-4 text-gray-400" />
                       <span className="text-gray-700 text-sm">
-                        {activity?.createdAt?.toLocaleDateString('pt-BR')}
+                        {activity?.created_at ? new Date(activity.created_at).toLocaleDateString('pt-BR') : 'N/A'}
                       </span>
                     </div>
                   </div>
+
+                  {activity?.updated_at && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Última Atualização</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-700 text-sm">
+                          {new Date(activity.updated_at).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -36,57 +36,27 @@ const Files = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const folders = [
-    { id: 1, name: 'Documentos', files: 24, color: 'bg-blue-100', icon: FileText },
-    { id: 2, name: 'Imagens', files: 156, color: 'bg-green-100', icon: Image },
-    { id: 3, name: 'Contratos', files: 12, color: 'bg-purple-100', icon: FileText },
-    { id: 4, name: 'Apresentações', files: 8, color: 'bg-orange-100', icon: FileText },
-    { id: 5, name: 'Vídeos', files: 45, color: 'bg-red-100', icon: Video },
-    { id: 6, name: 'Backups', files: 32, color: 'bg-gray-100', icon: Archive }
-  ];
+  const [folders, setFolders] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const files = [
-    {
-      id: 1,
-      name: 'Proposta_Cliente_ABC.pdf',
-      type: 'pdf',
-      size: '2.4 MB',
-      modified: '2 horas atrás',
-      category: 'Documentos',
-      icon: FileText,
-      starred: true
-    },
-    {
-      id: 2,
-      name: 'Logo_Empresa.png',
-      type: 'image',
-      size: '890 KB',
-      modified: '1 dia atrás',
-      category: 'Imagens',
-      icon: Image,
-      starred: false
-    },
-    {
-      id: 3,
-      name: 'Apresentacao_Vendas.mp4',
-      type: 'video',
-      size: '15.2 MB',
-      modified: '3 dias atrás',
-      category: 'Vídeos',
-      icon: Video,
-      starred: true
-    },
-    {
-      id: 4,
-      name: 'Contrato_Servicos.docx',
-      type: 'document',
-      size: '1.8 MB',
-      modified: '1 semana atrás',
-      category: 'Contratos',
-      icon: FileText,
-      starred: false
+  useEffect(() => {
+    fetchFilesData();
+  }, []);
+
+  const fetchFilesData = async () => {
+    try {
+      setLoading(true);
+      // Buscar pastas e arquivos do Supabase
+      // Por enquanto, arrays vazios
+      setFolders([]);
+      setFiles([]);
+    } catch (error) {
+      console.error('Erro ao buscar arquivos:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const handleFileAction = (action: string, fileName: string) => {
     toast.success(`${action} realizado em ${fileName}`);

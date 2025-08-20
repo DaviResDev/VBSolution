@@ -45,6 +45,7 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useToast } from '@/hooks/useToast';
+import { useAuth } from '@/contexts/AuthContext';
 import { AddItemModal } from '@/components/AddItemModal';
 import { AddUserModal } from '@/components/AddUserModal';
 import { EditItemModal } from '@/components/EditItemModal';
@@ -55,6 +56,7 @@ import { ToastContainer } from '@/components/ui/toast';
 
 export default function Settings() {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   const { success, error: showError, toasts, removeToast } = useToast();
   const {
     settings,
@@ -78,7 +80,7 @@ export default function Settings() {
     resetUserPassword,
     updateLogo,
     removeLogo,
-  } = useCompanySettings();
+  } = useCompanySettings(user?.id);
 
   const [activeTab, setActiveTab] = useState('company');
   const [companyForm, setCompanyForm] = useState({

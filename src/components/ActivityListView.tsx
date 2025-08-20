@@ -87,7 +87,7 @@ const ActivityListView = ({
     // Move selected activities to pending status
     selectedActivities.forEach(activityId => {
       const activity = activities.find(a => a.id === activityId);
-      if (activity && activity.status === 'backlog') {
+      if (activity && activity.status === 'cancelled') {
         onUpdateStatus(activityId, 'pending');
       }
     });
@@ -119,7 +119,8 @@ const ActivityListView = ({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'urgent': return 'bg-red-100 text-red-800 border-red-200';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'low': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -129,9 +130,8 @@ const ActivityListView = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'in-progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
-      case 'backlog': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
       case 'pending': return 'bg-orange-100 text-orange-800 border-orange-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -140,9 +140,8 @@ const ActivityListView = ({
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'completed': return 'Concluída';
-      case 'in-progress': return 'Em Andamento';
-      case 'overdue': return 'Atrasada';
-      case 'backlog': return 'Backlog';
+      case 'in_progress': return 'Em Andamento';
+      case 'cancelled': return 'Cancelada';
       case 'pending': return 'Pendente';
       default: return 'Pendente';
     }
@@ -194,14 +193,25 @@ const ActivityListView = ({
             <Badge className={`text-xs border ${getStatusColor(activity.status)}`}>
               {getStatusLabel(activity.status)}
             </Badge>
-            <span className="text-sm text-gray-600">{activity.type}</span>
+            <span className="text-sm text-gray-600">
+              {activity.type === 'task' ? 'Tarefa' :
+               activity.type === 'meeting' ? 'Reunião' :
+               activity.type === 'call' ? 'Chamada' :
+               activity.type === 'email' ? 'Email' :
+               activity.type === 'other' ? 'Outro' : activity.type}
+            </span>
           </div>
         );
       case 'prazo-final':
         return (
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Clock className="h-4 w-4" />
-            <span>{activity.date.toLocaleDateString('pt-BR')}</span>
+            <span>
+              {activity.due_date 
+                ? new Date(activity.due_date).toLocaleDateString('pt-BR')
+                : 'Sem prazo'
+              }
+            </span>
           </div>
         );
       case 'criado-por':
@@ -220,11 +230,11 @@ const ActivityListView = ({
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
               <span className="text-xs text-white font-medium">
-                {getEmployeeName(activity.responsibleId).charAt(0).toUpperCase()}
+                {getEmployeeName(activity.responsible_id || activity.assigned_to).charAt(0).toUpperCase()}
               </span>
             </div>
             <span className="text-sm text-gray-700">
-              {getEmployeeName(activity.responsibleId)}
+              {getEmployeeName(activity.responsible_id || activity.assigned_to)}
             </span>
           </div>
         );
@@ -233,7 +243,7 @@ const ActivityListView = ({
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-gray-400" />
             <span className="text-sm text-gray-600">
-              {getCompanyName(activity.companyId)}
+              {activity.project_id ? `Projeto ${activity.project_id.slice(0, 8)}...` : 'Sem projeto'}
             </span>
           </div>
         );
@@ -242,14 +252,25 @@ const ActivityListView = ({
           <div className="flex gap-1">
             <Badge className={`text-xs border ${getPriorityColor(activity.priority)}`}>
               {activity.priority === 'high' ? 'Alta' : 
-               activity.priority === 'medium' ? 'Média' : 'Baixa'}
+               activity.priority === 'medium' ? 'Média' : 
+               activity.priority === 'urgent' ? 'Urgente' : 'Baixa'}
             </Badge>
           </div>
         );
       case 'criado-em':
-        return <span className="text-sm text-gray-600">{activity.createdAt.toLocaleDateString('pt-BR')}</span>;
+        return <span className="text-sm text-gray-600">
+          {activity.created_at 
+            ? new Date(activity.created_at).toLocaleDateString('pt-BR')
+            : '-'
+          }
+        </span>;
       case 'modificado-em':
-        return <span className="text-sm text-gray-600">{activity.createdAt.toLocaleDateString('pt-BR')}</span>;
+        return <span className="text-sm text-gray-600">
+          {activity.updated_at 
+            ? new Date(activity.updated_at).toLocaleDateString('pt-BR')
+            : '-'
+          }
+        </span>;
       case 'concluida':
         return (
           <Checkbox 

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Users, Calendar, FileText, CheckCircle, Clock, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,56 +7,28 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// Mock data para colaborações
-const collaborations = [
-  {
-    id: 1,
-    title: "Projeto Marketing Digital 2024",
-    description: "Campanha integrada para lançamento de novos produtos",
-    status: "Em Andamento",
-    priority: "Alta",
-    members: [
-      { name: "Ana Silva", avatar: "", initials: "AS" },
-      { name: "Carlos Lima", avatar: "", initials: "CL" },
-      { name: "Maria Santos", avatar: "", initials: "MS" }
-    ],
-    progress: 65,
-    deadline: "2024-02-15",
-    category: "Marketing"
-  },
-  {
-    id: 2,
-    title: "Desenvolvimento Sistema CRM",
-    description: "Implementação de novo sistema de gestão de clientes",
-    status: "Planejamento",
-    priority: "Média",
-    members: [
-      { name: "João Costa", avatar: "", initials: "JC" },
-      { name: "Paula Oliveira", avatar: "", initials: "PO" }
-    ],
-    progress: 25,
-    deadline: "2024-03-30",
-    category: "Tecnologia"
-  },
-  {
-    id: 3,
-    title: "Treinamento Equipe Vendas",
-    description: "Programa de capacitação para novos produtos",
-    status: "Concluído",
-    priority: "Baixa",
-    members: [
-      { name: "Roberto Dias", avatar: "", initials: "RD" },
-      { name: "Sandra Ferreira", avatar: "", initials: "SF" },
-      { name: "Lucas Mendes", avatar: "", initials: "LM" }
-    ],
-    progress: 100,
-    deadline: "2024-01-20",
-    category: "Treinamento"
-  }
-];
-
 const Collaborations = () => {
+  // Dados carregados do Supabase
+  const [collaborations, setCollaborations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("todos");
+
+  const fetchCollaborations = async () => {
+    try {
+      setLoading(true);
+      // Buscar colaborações do Supabase
+      // Por enquanto, array vazio
+      setCollaborations([]);
+    } catch (error) {
+      console.error('Erro ao buscar colaborações:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCollaborations();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {

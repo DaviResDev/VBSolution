@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -23,44 +23,25 @@ import { toast } from 'sonner';
 const Writeoffs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [writeoffs, setWriteoffs] = useState([
-    {
-      id: '1',
-      name: 'Baixa - Produtos Danificados Set/2024',
-      reason: 'damage',
-      warehouse: 'main',
-      status: 'pending',
-      items: 12,
-      totalValue: 2850.45,
-      createdAt: '2024-09-15',
-      createdBy: 'João Silva',
-      notes: 'Produtos danificados durante transporte'
-    },
-    {
-      id: '2',
-      name: 'Baixa - Produtos Vencidos Ago/2024',
-      reason: 'expiry',
-      warehouse: 'secondary',
-      status: 'completed',
-      items: 8,
-      totalValue: 1200.00,
-      createdAt: '2024-08-20',
-      createdBy: 'Maria Santos',
-      notes: 'Produtos com validade vencida'
-    },
-    {
-      id: '3',
-      name: 'Baixa - Inventário Jul/2024',
-      reason: 'loss',
-      warehouse: 'main',
-      status: 'draft',
-      items: 5,
-      totalValue: 750.30,
-      createdAt: '2024-07-10',
-      createdBy: 'Carlos Oliveira',
-      notes: 'Produtos não localizados no inventário'
+  const [writeoffs, setWriteoffs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchWriteoffs();
+  }, []);
+
+  const fetchWriteoffs = async () => {
+    try {
+      setLoading(true);
+      // Buscar baixas de estoque do Supabase
+      // Por enquanto, array vazio
+      setWriteoffs([]);
+    } catch (error) {
+      console.error('Erro ao buscar baixas de estoque:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {

@@ -24,8 +24,6 @@ import {
   X
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { AdvancedFilters } from '@/components/ui/advanced-filters';
-import { ButtonGroup } from '@/components/ui/button-group';
 
 const Products = () => {
   const { products, loading, error, createProduct, updateProduct, deleteProduct } = useProducts();
@@ -212,6 +210,13 @@ const Products = () => {
     return (
       <div className="text-center text-red-600 p-4">
         <p>Erro ao carregar produtos: {error}</p>
+        <Button 
+          onClick={() => window.location.reload()} 
+          className="mt-4"
+          variant="outline"
+        >
+          Tentar Novamente
+        </Button>
       </div>
     );
   }
@@ -231,12 +236,10 @@ const Products = () => {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <ButtonGroup size="sm">
-              <Button variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Produto/Serviço
-              </Button>
-            </ButtonGroup>
+            <Button variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Produto/Serviço
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -459,7 +462,29 @@ const Products = () => {
             className="pl-10"
           />
         </div>
-        <AdvancedFilters />
+        <div className="flex gap-2">
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Tipos</SelectItem>
+              <SelectItem value="product">Produtos</SelectItem>
+              <SelectItem value="service">Serviços</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas Categorias</SelectItem>
+              {categories.map(category => (
+                <SelectItem key={category} value={category}>{category}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Products List */}

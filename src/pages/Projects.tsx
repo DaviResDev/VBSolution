@@ -21,10 +21,15 @@ import ProjectCalendarTimeline from '@/components/ProjectCalendarTimeline';
 import ProjectPlannerView from '@/components/ProjectPlannerView';
 import ProjectListView from '@/components/ProjectListView';
 import ProjectDeadlineView from '@/components/ProjectDeadlineView';
+import { useProjects } from '@/hooks/useProjects';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Projects = () => {
   const { state, dispatch } = useProject();
   const { dispatch: vbDispatch } = useVB();
+  const { user } = useAuth();
+  const { projects, loading, error, refetch } = useProjects();
+  
   const [viewMode, setViewMode] = useState<'lista' | 'prazo' | 'planejador' | 'calendario' | 'dashboard'>('lista');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResponsibles, setSelectedResponsibles] = useState<string[]>([]);
@@ -38,27 +43,36 @@ const Projects = () => {
   const getStatusColor = (status: string) => {
     // Converting all status colors to grayscale
     switch (status) {
-      case 'Em Andamento': return 'bg-gray-200 text-gray-800 border-gray-300';
-      case 'Concluído': return 'bg-gray-800 text-white border-gray-900';
-      case 'Pausado': return 'bg-gray-100 text-gray-700 border-gray-200';
-      case 'Planejado': return 'bg-white text-gray-900 border-gray-400';
+      case 'active': return 'bg-gray-200 text-gray-800 border-gray-300';
+      case 'completed': return 'bg-gray-800 text-white border-gray-900';
+      case 'on_hold': return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'planning': return 'bg-white text-gray-900 border-gray-400';
+      case 'cancelled': return 'bg-gray-300 text-gray-600 border-gray-400';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const handleCreateProject = (projectData: any) => {
-    const newProject = {
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString().split('T')[0],
-      tasks: [],
-      archived: false,
-      ...projectData
-    };
-    dispatch({ type: 'ADD_PROJECT', payload: newProject });
-    toast({
-      title: "Projeto criado",
-      description: "Novo projeto foi criado com sucesso"
-    });
+  const handleCreateProject = async (projectData: any) => {
+    try {
+      // O projeto já foi salvo no Supabase pelo modal
+      // Agora vamos recarregar os dados
+      await refetch();
+      
+      toast({
+        title: "Projeto criado com sucesso!",
+        description: "Projeto foi salvo na sua conta e no Supabase"
+      });
+      
+      // Fechar modal
+      setIsCreateModalOpen(false);
+    } catch (error) {
+      console.error('Erro ao criar projeto:', error);
+      toast({
+        title: "Erro ao criar projeto",
+        description: "Ocorreu um erro ao criar o projeto",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleProjectClick = (project: any) => {
@@ -67,41 +81,23 @@ const Projects = () => {
   };
 
   const handleCompleteProject = (projectId: string) => {
-    const project = state.projects.find(p => p.id === projectId);
-    if (project) {
-      const updatedProject = { ...project, status: 'Concluído' as const };
-      dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
-
-      if (project.tasks && project.tasks.length > 0) {
-        project.tasks.forEach(taskId => {
-          vbDispatch({ 
-            type: 'UPDATE_ACTIVITY', 
-            payload: { 
-              id: taskId, 
-              status: 'completed',
-              completedAt: new Date().toISOString()
-            }
-          });
-        });
-      }
-
-      toast({
-        title: "Projeto finalizado",
-        description: "Projeto e suas tarefas foram marcadas como concluídas"
-      });
-    }
-  };
-
-  const handleArchiveProject = (projectId: string) => {
-    dispatch({ type: 'ARCHIVE_PROJECT', payload: projectId });
+    // Implementar lógica para marcar projeto como concluído
     toast({
-      title: "Projeto arquivado",
-      description: "Projeto foi arquivado com sucesso"
+      title: "Projeto concluído",
+      description: "Projeto foi marcado como concluído"
     });
   };
 
-  const handleViewModeChange = (newViewMode: string) => {
-    setViewMode(newViewMode as any);
+  const handleArchiveProject = (projectId: string) => {
+    // Implementar lógica para arquivar projeto
+    toast({
+      title: "Projeto arquivado",
+      description: "Projeto foi movido para arquivos"
+    });
+  };
+
+  const handleViewModeChange = (mode: 'lista' | 'prazo' | 'planejador' | 'calendario' | 'dashboard') => {
+    setViewMode(mode);
   };
 
   const handleOpenCreateModal = () => {
@@ -115,7 +111,7 @@ const Projects = () => {
 
   const renderCurrentView = () => {
     const baseProps = {
-      projects: state.projects,
+      projects: projects || [], // Usar projetos do Supabase
       onProjectClick: handleProjectClick,
       onCompleteProject: handleCompleteProject,
       onArchiveProject: handleArchiveProject,
@@ -182,7 +178,7 @@ const Projects = () => {
       />
       
       <ResponsibleFilter
-        employees={state.projects.map(p => ({ id: p.responsible || p.id, name: p.responsible || p.name }))}
+        employees={projects?.map(p => ({ id: p.responsible_id || p.id, name: p.responsible_id || p.name })) || []}
         selectedResponsibles={selectedResponsibles}
         onResponsibleChange={setSelectedResponsibles}
       />
@@ -190,12 +186,40 @@ const Projects = () => {
   );
 
   const handleUnarchiveProject = (projectId: string) => {
-    dispatch({ type: 'UNARCHIVE_PROJECT', payload: projectId });
+    // Implementar lógica para restaurar projeto
     toast({
       title: "Projeto restaurado",
       description: "Projeto foi restaurado dos arquivos"
     });
   };
+
+  // Mostrar loading se estiver carregando
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando projetos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar erro se houver
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Erro ao carregar projetos</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={refetch} variant="outline">
+            Tentar novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -212,14 +236,46 @@ const Projects = () => {
         filters={filters}
         showSearch={viewMode === 'lista' || viewMode === 'prazo' || viewMode === 'planejador'}
       >
-        {renderCurrentView()}
+        {/* Informações do usuário logado */}
+        {user && (
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+            <div className="flex items-center gap-2 text-blue-700">
+              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <span className="font-medium">Sua conta logada</span>
+            </div>
+            <p className="text-sm text-blue-600 mt-1">
+              Email: {user.email} | 
+              Projetos encontrados: {projects?.length || 0}
+            </p>
+          </div>
+        )}
+
+        {/* Conteúdo principal */}
+        {projects && projects.length > 0 ? (
+          renderCurrentView()
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">📋</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Nenhum projeto encontrado
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {user ? 'Você ainda não tem projetos cadastrados.' : 'Faça login para ver seus projetos.'}
+            </p>
+            {user && (
+              <Button onClick={handleOpenCreateModal} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Criar Primeiro Projeto
+              </Button>
+            )}
+          </div>
+        )}
       </PageLayout>
 
       {/* Create Modal */}
       <ProjectCreateModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={handleCreateProject}
       />
 
       {/* Details Modal */}

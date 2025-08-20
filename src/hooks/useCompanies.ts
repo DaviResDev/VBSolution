@@ -1,116 +1,121 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Company {
   id: string;
-  fantasy_name: string;
-  company_name?: string;
+  name: string;
   cnpj?: string;
-  reference?: string;
-  cep?: string;
+  email?: string;
+  phone?: string;
   address?: string;
   city?: string;
   state?: string;
-  email?: string;
-  phone?: string;
   responsible_id?: string;
   logo_url?: string;
   description?: string;
   sector?: string;
+  status?: string;
   created_at: string;
   updated_at: string;
 }
 
 export const useCompanies = () => {
+  const { user } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCompanies = async () => {
+    console.log('🔍 Iniciando busca de empresas...');
+    console.log('👤 Usuário atual:', user ? `ID: ${user.id}` : 'Não autenticado');
+    
+    if (!user) {
+      console.log('❌ Usuário não autenticado, abortando busca');
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('📡 Fazendo consulta ao Supabase...');
+      console.log('🔗 URL do Supabase:', supabase.supabaseUrl);
+      
+      // Primeiro, testar se a tabela existe e é acessível
+      const { data: testData, error: testError } = await supabase
+        .from('companies')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Erro ao testar acesso à tabela companies:', testError);
+        throw new Error(`Problema de acesso à tabela companies: ${testError.message}`);
+      }
+      
+      console.log('✅ Tabela companies acessível');
+      
+      // Agora fazer a consulta real
       const { data, error } = await supabase
         .from('companies')
         .select('*')
+        .eq('responsible_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      let companiesData = data || [];
-      
-      // Se não há empresas, criar empresas de exemplo
-      if (companiesData.length === 0) {
-        const sampleCompanies = [
-          {
-            fantasy_name: 'Tech Solutions Ltda',
-            company_name: 'Tech Solutions Tecnologia Ltda',
-            email: 'contato@techsolutions.com.br',
-            phone: '(11) 98765-4321',
-            city: 'São Paulo',
-            state: 'SP',
-            sector: 'Tecnologia'
-          },
-          {
-            fantasy_name: 'Inovação Digital',
-            company_name: 'Inovação Digital Serviços Ltda',
-            email: 'vendas@inovacaodigital.com.br',
-            phone: '(21) 99876-5432',
-            city: 'Rio de Janeiro',
-            state: 'RJ',
-            sector: 'Marketing Digital'
-          },
-          {
-            fantasy_name: 'Consultoria Prime',
-            company_name: 'Prime Consultoria Empresarial S.A.',
-            email: 'prime@consultoria.com.br',
-            phone: '(31) 91234-5678',
-            city: 'Belo Horizonte',
-            state: 'MG',
-            sector: 'Consultoria'
-          }
-        ];
-        
-        for (const company of sampleCompanies) {
-          const { data: newCompany, error: createError } = await supabase
-            .from('companies')
-            .insert([company])
-            .select()
-            .single();
-          
-          if (!createError && newCompany) {
-            companiesData.push(newCompany);
-          }
-        }
+      if (error) {
+        console.error('❌ Erro na consulta Supabase:', error);
+        throw error;
       }
       
-      setCompanies(companiesData);
+      console.log('✅ Consulta bem-sucedida, empresas encontradas:', data?.length || 0);
+      console.log('🏢 Dados das empresas:', data);
+      
+      setCompanies(data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error fetching companies');
+      console.error('💥 Erro ao buscar empresas:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao buscar empresas';
+      setError(errorMessage);
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
   };
 
   const createCompany = async (companyData: Omit<Company, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
     try {
+      console.log('🏗️ Criando empresa:', companyData);
+      
+      const companyWithUser = {
+        ...companyData,
+        responsible_id: user.id
+      };
+
       const { data, error } = await supabase
         .from('companies')
-        .insert([companyData])
+        .insert([companyWithUser])
         .select()
         .single();
 
       if (error) throw error;
-      await fetchCompanies();
+      
+      console.log('✅ Empresa criada com sucesso:', data);
+      await fetchCompanies(); // Recarregar dados
       return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error creating company');
+      console.error('❌ Erro ao criar empresa:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao criar empresa');
       throw err;
     }
   };
 
   const updateCompany = async (id: string, updates: Partial<Company>) => {
     try {
+      console.log('🔄 Atualizando empresa:', { id, updates });
+      
       const { data, error } = await supabase
         .from('companies')
         .update(updates)
@@ -119,32 +124,47 @@ export const useCompanies = () => {
         .single();
 
       if (error) throw error;
-      await fetchCompanies();
+      
+      console.log('✅ Empresa atualizada com sucesso:', data);
+      await fetchCompanies(); // Recarregar dados
       return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error updating company');
+      console.error('❌ Erro ao atualizar empresa:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar empresa');
       throw err;
     }
   };
 
   const deleteCompany = async (id: string) => {
     try {
+      console.log('🗑️ Excluindo empresa:', id);
+      
       const { error } = await supabase
         .from('companies')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-      await fetchCompanies();
+      
+      console.log('✅ Empresa excluída com sucesso');
+      await fetchCompanies(); // Recarregar dados
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error deleting company');
+      console.error('❌ Erro ao excluir empresa:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao excluir empresa');
       throw err;
     }
   };
 
   useEffect(() => {
-    fetchCompanies();
-  }, []);
+    console.log('🔄 useEffect executado, usuário:', user ? 'Autenticado' : 'Não autenticado');
+    if (user) {
+      fetchCompanies();
+    } else {
+      setLoading(false);
+      setCompanies([]);
+      setError(null);
+    }
+  }, [user]);
 
   return {
     companies,

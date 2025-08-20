@@ -26,12 +26,12 @@ interface UserProviderProps {
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [userName, setUserName] = useState(() => {
     const saved = localStorage.getItem('userName');
-    return saved || 'Davi';
+    return saved || '';
   });
 
   const [userEmail, setUserEmail] = useState(() => {
     const saved = localStorage.getItem('userEmail');
-    return saved || 'davi@exemplo.com';
+    return saved || '';
   });
 
   const [userAvatar, setUserAvatar] = useState(() => {

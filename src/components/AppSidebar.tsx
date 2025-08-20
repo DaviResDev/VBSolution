@@ -3,12 +3,14 @@ import { Home, Building2, Users, Calendar, Target, Settings, Phone, ShoppingCart
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarGroup, SidebarGroupContent, SidebarGroupLabel } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
+import UserProfile from './UserProfile';
 
 const AppSidebar = () => {
   return (
     <Sidebar className="border-r border-gray-200 bg-white">
-      <SidebarHeader className="px-4 py-6">
-        <h1 className="text-xl font-bold text-gray-900">CRM Sistema</h1>
+      {/* Header com perfil do usuário */}
+      <SidebarHeader className="px-4 py-6 border-b border-gray-100">
+        <UserProfile variant="sidebar" />
       </SidebarHeader>
       
       <SidebarContent className="px-2">

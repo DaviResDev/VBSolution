@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const Reports = () => {
   const { state } = useVB();
@@ -59,14 +59,21 @@ const Reports = () => {
     }).length
   }));
 
-  const monthlyTrend = [
-    { month: 'Jan', companies: 12, activities: 45, conversions: 3 },
-    { month: 'Fev', companies: 15, activities: 52, conversions: 5 },
-    { month: 'Mar', companies: 18, activities: 48, conversions: 4 },
-    { month: 'Abr', companies: 22, activities: 65, conversions: 8 },
-    { month: 'Mai', companies: 25, activities: 58, conversions: 6 },
-    { month: 'Jun', companies: 28, activities: 72, conversions: 10 }
-  ];
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
+
+  useEffect(() => {
+    fetchMonthlyTrend();
+  }, [selectedPeriod]);
+
+  const fetchMonthlyTrend = async () => {
+    try {
+      // Buscar tendência mensal do Supabase
+      // Por enquanto, array vazio
+      setMonthlyTrend([]);
+    } catch (error) {
+      console.error('Erro ao buscar tendência mensal:', error);
+    }
+  };
 
   const productPerformance = products.map(product => ({
     name: product.name,

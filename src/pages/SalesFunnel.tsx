@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Filter, Settings, Search, Users, Building2, Calendar, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,11 +19,33 @@ const SalesFunnel = () => {
     setIsCreateModalOpen(true);
   };
 
-  const mockStats = {
-    totalDeals: deals?.length || 0,
-    totalValue: deals?.reduce((sum, deal) => sum + Number(deal.value), 0) || 0,
-    avgTicket: deals?.length ? (deals.reduce((sum, deal) => sum + Number(deal.value), 0) / deals.length) : 0,
-    conversionRate: 68
+  const [stats, setStats] = useState({
+    totalDeals: 0,
+    totalValue: 0,
+    avgTicket: 0,
+    conversionRate: 0
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, [deals]);
+
+  const fetchStats = async () => {
+    try {
+      if (deals && deals.length > 0) {
+        const totalValue = deals.reduce((sum, deal) => sum + Number(deal.value), 0);
+        const avgTicket = totalValue / deals.length;
+        
+        setStats({
+          totalDeals: deals.length,
+          totalValue,
+          avgTicket,
+          conversionRate: 0 // Será calculado baseado no funil de vendas
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao calcular estatísticas:', error);
+    }
   };
 
   return (
@@ -57,7 +79,7 @@ const SalesFunnel = () => {
                 <TrendingUp className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Total de Negócios</p>
-                  <p className="text-2xl font-bold text-gray-900">{mockStats.totalDeals}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalDeals}</p>
                 </div>
               </div>
             </CardContent>
@@ -70,7 +92,7 @@ const SalesFunnel = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Valor Total</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R$ {mockStats.totalValue.toLocaleString('pt-BR')}
+                    R$ {stats.totalValue.toLocaleString('pt-BR')}
                   </p>
                 </div>
               </div>
@@ -84,7 +106,7 @@ const SalesFunnel = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Ticket Médio</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R$ {mockStats.avgTicket.toLocaleString('pt-BR')}
+                    R$ {stats.avgTicket.toLocaleString('pt-BR')}
                   </p>
                 </div>
               </div>
@@ -97,7 +119,7 @@ const SalesFunnel = () => {
                 <Calendar className="h-8 w-8 text-purple-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Taxa de Conversão</p>
-                  <p className="text-2xl font-bold text-gray-900">{mockStats.conversionRate}%</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.conversionRate}%</p>
                 </div>
               </div>
             </CardContent>

@@ -36,57 +36,27 @@ export interface Post {
 }
 
 export const usePosts = () => {
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '1',
-      author: {
-        name: 'Ana Silva',
-        role: 'Gerente de Vendas'
-      },
-      content: 'Acabamos de fechar mais um negócio importante! A equipe está de parabéns pelo excelente trabalho.',
-      timestamp: '2 horas atrás',
-      likes: 24,
-      comments: 8,
-      type: 'text',
-      postComments: [
-        {
-          id: 'c1',
-          author: { name: 'Carlos Santos', initials: 'CS' },
-          content: 'Parabéns pelo resultado!',
-          timestamp: '1h atrás'
-        }
-      ]
-    },
-    {
-      id: '2',
-      author: {
-        name: 'Carlos Santos',
-        role: 'Desenvolvedor'
-      },
-      content: 'Compartilhando algumas dicas sobre produtividade que têm funcionado muito bem para mim.',
-      timestamp: '4 horas atrás',
-      likes: 15,
-      comments: 3,
-      type: 'text',
-      postComments: []
-    },
-    {
-      id: '3',
-      author: {
-        name: 'Marina Costa',
-        role: 'Designer'
-      },
-      content: 'Novo projeto finalizado! Estou muito satisfeita com o resultado final.',
-      timestamp: '1 dia atrás',
-      likes: 32,
-      comments: 12,
-      type: 'text',
-      postComments: []
-    }
-  ]);
-
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      // Buscar posts do Supabase
+      // Por enquanto, array vazio
+      setPosts([]);
+    } catch (error) {
+      console.error('Erro ao buscar posts:', error);
+      setError('Erro ao carregar posts');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const createPost = async (
     content: string, 

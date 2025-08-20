@@ -57,6 +57,25 @@ export function useAuth() {
         return { error };
       }
 
+      // Se o cadastro foi bem-sucedido, criar o perfil na tabela profiles
+      if (data.user) {
+        try {
+          await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: data.user.id,
+                email: data.user.email,
+                name: userData.name || '',
+                company: userData.company || '',
+              }
+            ]);
+        } catch (profileError) {
+          console.error('Erro ao criar perfil:', profileError);
+          // Não falha o cadastro se houver erro na criação do perfil
+        }
+      }
+
       toast({
         title: "Cadastro realizado com sucesso!",
         description: "Verifique seu email para confirmar a conta.",
@@ -80,6 +99,8 @@ export function useAuth() {
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       });
+      // Redirecionar para login após logout
+      window.location.href = '/login';
     } catch (error) {
       toast({
         title: "Erro no logout",

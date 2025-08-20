@@ -152,12 +152,7 @@ export function SessionNavBar() {
       title: "Colaboração",
       icon: <Handshake className="h-6 w-6" />,
       items: [
-        {
-          id: "messages",
-          title: "Mensagens",
-          path: "/messages",
-          icon: <MessageCircle className="h-5 w-5" />
-        },
+
         {
           id: "feed",
           title: "Feed",
@@ -170,12 +165,7 @@ export function SessionNavBar() {
           path: "/work-groups",
           icon: <Users2 className="h-5 w-5" />
         },
-        {
-          id: "documents",
-          title: "Documentos",
-          path: "/documents",
-          icon: <FileText className="h-5 w-5" />
-        },
+
         {
           id: "calendar",
           title: "Calendário",
