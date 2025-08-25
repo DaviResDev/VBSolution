@@ -4,10 +4,18 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+<<<<<<< HEAD
 # Embedded repositories
 vb-solution-main/
 vb-solution-master/
 vb-solution-migrations/
+=======
+# Build outputs
+dist/
+build/
+.next/
+out/
+>>>>>>> a9dbd2aa2a911497f0be204adac2723b241d4345
 
 # Environment variables
 .env
@@ -16,6 +24,7 @@ vb-solution-migrations/
 .env.test.local
 .env.production.local
 
+<<<<<<< HEAD
 # Build outputs
 dist/
 build/
@@ -27,12 +36,40 @@ logs
 
 # Runtime data
 pids
+=======
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+>>>>>>> a9dbd2aa2a911497f0be204adac2723b241d4345
 *.pid
 *.seed
 *.pid.lock
 
 # Coverage directory used by tools like istanbul
 coverage/
+<<<<<<< HEAD
+=======
+*.lcov
+>>>>>>> a9dbd2aa2a911497f0be204adac2723b241d4345
 
 # nyc test coverage
 .nyc_output
@@ -43,6 +80,18 @@ jspm_packages/
 # Optional npm cache directory
 .npm
 
+<<<<<<< HEAD
+=======
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+>>>>>>> a9dbd2aa2a911497f0be204adac2723b241d4345
 # Optional REPL history
 .node_repl_history
 
@@ -52,6 +101,7 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
+<<<<<<< HEAD
 # dotenv environment variables file
 .env
 
@@ -69,3 +119,36 @@ jspm_packages/
 .Trashes
 ehthumbs.db
 Thumbs.db
+=======
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# WhatsApp session files
+.wwebjs_auth/
+.wwebjs_cache/
+.wwebjs_sessions/
+
+# Supabase
+.supabase/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+>>>>>>> a9dbd2aa2a911497f0be204adac2723b241d4345
